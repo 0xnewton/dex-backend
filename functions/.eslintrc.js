@@ -24,10 +24,17 @@ module.exports = {
   plugins: [
     "@typescript-eslint",
     "import",
+    "prettier",
   ],
   rules: {
     "quotes": ["error", "double"],
     "import/no-unresolved": 0,
     "indent": ["error", 2],
+    "object-curly-spacing": 0,
+    "max-len": ["error", { "code": 12400 }],
+    "require-jsdoc": 0,
+    "valid-jsdoc": 0,
+    "new-cap": 0,
+    "operator-linebreak": 0,
   },
 };
