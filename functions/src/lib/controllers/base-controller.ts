@@ -7,7 +7,7 @@ import {
   ExpressResponse,
   ExpressRouter,
 } from "./express.types";
-import { BaseApiError } from "./errors";
+import { BaseApiError } from "../errors";
 
 export interface RequestMiddleware extends ExpressRequestHandler {
   <TRequest, TResponse>(

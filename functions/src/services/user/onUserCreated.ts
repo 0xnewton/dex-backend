@@ -4,6 +4,7 @@ import { createSolanaWallet } from "../../lib/crypto";
 import { logger } from "firebase-functions";
 import { createSecret, deleteSecret } from "../../lib/secretManager";
 import { v4 as uuidv4 } from "uuid";
+import { makeSlug } from "../../lib/slugs";
 
 export type OnUserCreatedFunction = (user: UserRecord) => Promise<void>;
 
@@ -17,11 +18,12 @@ export const onUserCreated: OnUserCreatedFunction = async (user) => {
     secretId,
   });
   const privateKeyPath = await createSecret(secretId, wallet.privateKey);
-
+  const slug = user.displayName ? makeSlug(user.displayName) : user.uid;
   try {
     // Creates a user in firestore
     await createUser({
       userID: user.uid,
+      slug,
       displayName: user.displayName || "",
       avatarUrl: user.photoURL || "",
       walletAddress: wallet.publicKey,

@@ -1,9 +1,10 @@
 import { UserDB } from "./types";
-import { getNewUserDoc } from "../generic";
+import { getUserDoc } from "../generic";
 import { SOLANA_WALLET_ADDRESS } from "../generic/types";
 
 interface CreateUserPayload {
   userID: string;
+  slug: string;
   displayName: string;
   avatarUrl?: string;
   walletAddress: SOLANA_WALLET_ADDRESS;
@@ -13,16 +14,18 @@ interface CreateUserPayload {
 export const createUser = async (
   payload: CreateUserPayload
 ): Promise<UserDB> => {
-  const userDoc = getNewUserDoc();
+  const userDoc = getUserDoc(payload.userID);
   const timestamp = FirebaseFirestore.Timestamp.now();
   const userData: UserDB = {
-    id: payload.userID,
+    id: userDoc.id,
+    slug: payload.slug,
     displayName: payload.displayName,
-    avatarUrl: payload.avatarUrl,
+    avatarUrl: payload.avatarUrl ?? null,
     createdAt: timestamp,
     updatedAt: timestamp,
     walletAddress: payload.walletAddress,
     privateKeyPath: payload.privateKeyPath,
+    deletedAt: null,
   };
   await userDoc.create(userData);
   return userData;
