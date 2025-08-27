@@ -6,8 +6,11 @@ import {
   ExpressRequestHandler,
   ExpressResponse,
   ExpressRouter,
-} from "./express.types";
+} from "./types";
 import { BaseApiError } from "../errors";
+import { RestApiContext } from "./rest-api-context";
+import { HttpMethod } from "./http";
+import { ZodError } from "zod";
 
 export interface RequestMiddleware extends ExpressRequestHandler {
   <TRequest, TResponse>(
@@ -17,15 +20,12 @@ export interface RequestMiddleware extends ExpressRequestHandler {
   ): TResponse | Promise<TResponse> | void;
 }
 
-export interface RequestHandler extends ExpressRequestHandler {
-  <TRequest, TResponse>(
-    request: TRequest extends ExpressRequest ? TRequest : never,
-    response: TResponse extends ExpressResponse ? TResponse : never
-  ): TResponse | Promise<TResponse> | void;
+export interface RequestHandler {
+  (context: RestApiContext): Promise<ExpressResponse>;
 }
 
 export interface IRouteMeta {
-  method: "get" | "post" | "put" | "patch" | "delete";
+  method: HttpMethod;
   path?: string;
   methodName: string;
   middleware?: RequestMiddleware[];
@@ -79,28 +79,32 @@ const requestCallbackErrorHandlerWrapper = (
   methodName: string,
   callback: RequestHandler
 ): RequestHandler => {
-  return async <TRequest, TResponse>(
-    request: TRequest extends ExpressRequest ? TRequest : never,
-    response: TResponse extends ExpressResponse ? TResponse : never
-  ) => {
+  return async (context: RestApiContext) => {
     logger.info(`${controllerName}.${methodName} request`, {
-      body: request.body,
-      queryParams: request.query,
+      body: context.request.body,
+      queryParams: context.request.query,
     });
+
     try {
-      const result = await callback(request, response);
+      const result = await callback(context);
       return result;
     } catch (err) {
       logger.error(`${controllerName}.${methodName} unexpected error`, {
         stack: err instanceof Error ? err.stack : undefined,
-        body: request.body,
-        queryParams: request.query,
+        body: context.request.body,
+        queryParams: context.request.query,
         message: err instanceof Error ? err.message : undefined,
       });
       if (err instanceof BaseApiError) {
-        return response.status(err.status).send({ message: err.message });
+        return context.response
+          .status(err.status)
+          .send({ message: err.message });
+      } else if (err instanceof ZodError) {
+        return context.response
+          .status(400)
+          .send({ message: "Validation error", issues: err.issues });
       } else {
-        return response
+        return context.response
           .status(500)
           .send({ message: "Unexpected error occurred" });
       }

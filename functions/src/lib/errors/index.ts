@@ -18,3 +18,15 @@ export class AlreadyExistsError extends BaseApiError {
     super(message, 409);
   }
 }
+
+export class UnauthorizedError extends BaseApiError {
+  constructor(message: string = "Unauthorized") {
+    super(message, 401);
+  }
+}
+
+export class ExpiredTokenError extends BaseApiError {
+  constructor(message: string = "Token has expired") {
+    super(message, 401);
+  }
+}

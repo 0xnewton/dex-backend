@@ -1,1 +1,1 @@
-export * from "./onUserCreated";
+export * from "./on-user-created";
