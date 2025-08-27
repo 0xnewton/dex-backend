@@ -86,6 +86,11 @@ const requestCallbackErrorHandlerWrapper = (
     });
 
     try {
+      const authHeader = context.request.header("authorization") ?? "";
+      if (authHeader.toLowerCase().startsWith("bearer ")) {
+        context.token = authHeader.slice("bearer ".length).trim();
+      }
+
       const result = await callback(context);
       return result;
     } catch (err) {
