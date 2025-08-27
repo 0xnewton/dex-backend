@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   IBaseController,
   IRouteMeta,
@@ -34,7 +33,7 @@ export const Route =
           : undefined;
 
         const queryParams = def.queryParamsSchema
-          ? (def.queryParamsSchema as z.ZodTypeAny).parse(ctx.request.query)
+          ? def.queryParamsSchema.parse(ctx.request.query)
           : undefined;
 
         // Build typed args
@@ -45,7 +44,8 @@ export const Route =
           ...(queryParams !== undefined ? { queryParams } : {}),
         } as RestApiContextWith<T>;
 
-        return value.call(this, typedCtx);
+        const handler = (this as any)[methodName] as (c: RestApiContextWith<T>) => ReturnType<RequestHandler>;
+        return handler.call(this, typedCtx);
       };
 
       const route: IRouteMeta = {

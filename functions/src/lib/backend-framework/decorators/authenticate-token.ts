@@ -23,7 +23,8 @@ export function AuthenticateToken() {
       let data: DecodedIdToken;
       try {
         data = await auth.verifyIdToken(token, checkRevoked);
-      } catch (e: any) {
+      } catch (e) {
+        logger.error("Error verifying token", {details: e?.message});
         throw new UnauthorizedError("Invalid token");
       }
 

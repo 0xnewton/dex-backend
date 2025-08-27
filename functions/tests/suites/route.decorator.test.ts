@@ -2,7 +2,11 @@ import { ZodError } from "zod";
 import { type IRouteMeta } from "../../src/lib/backend-framework/base-controller";
 import { makeRandomObject, makeRestApiContext } from "../factories/http";
 import { makeRandomRoute, RandomRoute } from "../factories/route";
-import { makeController, makeControllerWithMultipleRoutes, TestControllerBase } from "../factories/controller";
+import {
+  makeController,
+  makeControllerWithMultipleRoutes,
+  TestControllerBase,
+} from "../factories/controller";
 import { faker } from "@faker-js/faker";
 import { fakeFromZod } from "../factories/zod";
 
@@ -65,13 +69,7 @@ describe("Route decorator", () => {
         body: makeRandomObject(),
       });
 
-      let err: any;
-      try {
-        await r.callback(ctx);
-      } catch (e) {
-        err = e;
-      }
-      expect(err).toBeInstanceOf(ZodError);
+      await expect(r.callback(ctx)).rejects.toBeInstanceOf(ZodError);
     });
   });
 
@@ -107,13 +105,7 @@ describe("Route decorator", () => {
         params: makeRandomObject(),
       });
 
-      let err: any;
-      try {
-        await r.callback(ctx);
-      } catch (e) {
-        err = e;
-      }
-      expect(err).toBeInstanceOf(ZodError);
+      await expect(r.callback(ctx)).rejects.toBeInstanceOf(ZodError);
     });
   });
 
@@ -149,13 +141,7 @@ describe("Route decorator", () => {
         query: makeRandomObject(),
       });
 
-      let err: any;
-      try {
-        await r.callback(ctx);
-      } catch (e) {
-        err = e;
-      }
-      expect(err).toBeInstanceOf(ZodError);
+      await expect(r.callback(ctx)).rejects.toBeInstanceOf(ZodError);
     });
   });
 
@@ -191,13 +177,7 @@ describe("Route decorator", () => {
         body: makeRandomObject(),
       });
 
-      let err: any;
-      try {
-        await r.callback(ctx);
-      } catch (e) {
-        err = e;
-      }
-      expect(err).toBeInstanceOf(ZodError);
+      await expect(r.callback(ctx)).rejects.toBeInstanceOf(ZodError);
     });
   });
 
@@ -262,13 +242,7 @@ describe("Route decorator", () => {
         body: randomRoute.def.payloadSchema ? makeRandomObject() : undefined,
       });
 
-      let err: any;
-      try {
-        await route.callback(ctx);
-      } catch (e) {
-        err = e;
-      }
-      expect(err).toBeInstanceOf(ZodError);
+      await expect(route.callback(ctx)).rejects.toBeInstanceOf(ZodError);
     });
   });
 
@@ -277,13 +251,13 @@ describe("Route decorator", () => {
     let controller: TestControllerBase;
 
     beforeEach(() => {
-      randomRoutes = [
-        makeRandomRoute(),
-        makeRandomRoute(),
-      ];
-      controller = makeControllerWithMultipleRoutes(randomRoutes[0].def, randomRoutes[1].def);
+      randomRoutes = [makeRandomRoute(), makeRandomRoute()];
+      controller = makeControllerWithMultipleRoutes(
+        randomRoutes[0].def,
+        randomRoutes[1].def
+      );
     });
-        
+
     it("registers metadata for both routes", () => {
       expect(controller.routes).toHaveLength(2);
       const r1: IRouteMeta = controller.routes[0];

@@ -3,7 +3,10 @@
   "compilerOptions": {
     "noEmit": true,
     "rootDir": ".",
-    "types": ["jest", "node"]
+    "types": ["jest", "node"],
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "isolatedModules": true
   },
   "include": ["tests", "src"]
 }

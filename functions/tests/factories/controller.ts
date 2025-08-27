@@ -1,4 +1,5 @@
 import {
+  AuthenticateToken,
   BaseController,
   Route,
   RouteCtx,
@@ -35,6 +36,20 @@ export function makeControllerWithMultipleRoutes<
     async handler2(ctx: RouteCtx<T2>) {
       this.seen = { route: 2, ctx };
       return ctx.response.json({ ok: true, route: 2 });
+    }
+  }
+  return new TestController("TestController", "/t");
+}
+
+export function makeControllerWithAuthentication<T extends RouteDefinition>(
+  def: T
+) {
+  class TestController extends TestControllerBase {
+    @AuthenticateToken()
+    @Route(def)
+    async handler(ctx: RouteCtx<T>) {
+      this.seen = ctx;
+      return ctx.response.json({ ok: true });
     }
   }
   return new TestController("TestController", "/t");

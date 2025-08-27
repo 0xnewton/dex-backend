@@ -113,8 +113,8 @@ export function randomZodObject(fields?: Partial<Record<string, z.ZodTypeAny>>):
     const name = faker.helpers.slugify(faker.word.noun()).replace(/-/g, '_');
     shape[name] = faker.helpers.arrayElement([
       z.string(),
-      z.coerce.number().int().min(0).max(9999),
-      z.coerce.boolean(),
+      z.number().int().min(0).max(9999),
+      z.boolean(),
     ]);
   }
   return z.object(shape);
