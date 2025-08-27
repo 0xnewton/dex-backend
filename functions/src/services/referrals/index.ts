@@ -1,4 +1,4 @@
-import { CreateReferralFunction, createReferral } from "./createReferral";
+import { CreateReferralFunction, createReferral } from "./create-referral";
 
 interface ReferralServiceInterface {
   createReferral: CreateReferralFunction;

@@ -1,3 +1,3 @@
-export * from "./createReferral";
-export * from "./getReferralCountForUser";
-export * from "./getReferralBySlug";
+export * from "./create-referral";
+export * from "./get-referral-count-for-user";
+export * from "./get-referral-by-slug";

@@ -1,4 +1,4 @@
-import { onUserCreated, OnUserCreatedFunction } from "./onUserCreated";
+import { onUserCreated, OnUserCreatedFunction } from "./on-user-created";
 
 interface UserServiceInterface {
   onUserCreated: OnUserCreatedFunction;
