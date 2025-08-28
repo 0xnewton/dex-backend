@@ -8,5 +8,5 @@
     "noUnusedParameters": false,
     "isolatedModules": true
   },
-  "include": ["tests", "src"]
+  "include": ["tests", "src"],
 }

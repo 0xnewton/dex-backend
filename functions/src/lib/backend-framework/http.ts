@@ -1,3 +1,5 @@
+import { ExpressRequest } from "./types";
+
 export enum HttpMethod {
   GET = "get",
   POST = "post",
@@ -21,3 +23,16 @@ export enum StatusCodes {
   INTERNAL_SERVER_ERROR = 500,
   TEMPORARILY_UNAVAILABLE = 503,
 }
+
+export const getHeader = (req: ExpressRequest, name: string): string => {
+  const fromFn =
+    (typeof req.header === "function" ? req.header(name) : undefined) ??
+    (typeof req.get === "function" ? req.get(name) : undefined);
+
+  const headers = req.headers ?? {};
+  const key = Object.keys(headers).find(k => k.toLowerCase() === name.toLowerCase());
+  const fromObj = key ? headers[key] : undefined;
+
+  const v = fromFn ?? fromObj ?? "";
+  return Array.isArray(v) ? v[0] : v;
+};

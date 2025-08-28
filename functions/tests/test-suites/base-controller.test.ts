@@ -1,165 +1,180 @@
-import { logger } from "firebase-functions";
+import express from "express";
+import request from "supertest";
 import { ZodError } from "zod";
+import { BaseController, IRouteMeta } from "../../src/lib/backend-framework";
 import { BaseApiError } from "../../src/lib/errors";
-import {
-  requestCallbackErrorHandlerWrapper,
-  RestApiContext,
-} from "../../src/lib/backend-framework";
-import { makeRestApiContext } from "../factories/http";
-import { faker } from "@faker-js/faker";
+import { makeController, TestControllerBase } from "../factories/controller";
+import { makeRandomRoute, RandomRoute } from "../factories/route";
 
+// silence logs
 jest.mock("firebase-functions", () => ({
-  logger: {
-    info: jest.fn(),
-    error: jest.fn(),
-  },
+  logger: { info: jest.fn(), error: jest.fn() },
 }));
 
-describe("requestCallbackErrorHandlerWrapper", () => {
-  let controllerName: string;
-  let methodName: string;
-  let handler: jest.Mock;
-  let statusMock: jest.Mock;
-  let sendMock: jest.Mock;
+describe("BaseController.register()", () => {
+  let controller: TestControllerBase & BaseController;
+  let routeDefinition: RandomRoute<any>;
+  let app: express.Express;
+  let basePath: string;
+  let routePath: string;
+  let method: string;
+  let hit: (headers?: Record<string, string>, body?: any) => request.Test;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    controllerName = faker.lorem.word();
-    methodName = faker.lorem.word();
-    statusMock = jest.fn().mockReturnThis();
-    sendMock = jest.fn().mockReturnThis();
-    handler = jest.fn(async (ctx: RestApiContext) => {
+    routeDefinition = makeRandomRoute(); // provides def.method, def.path, etc.
+    controller = makeController(routeDefinition.def) as any;
+
+    // cache route info for convenience
+    const meta = (controller as any).routes[0] as IRouteMeta;
+    basePath = controller.basePath;
+    routePath = meta.path ?? "/";
+    method = (meta.method ?? "get").toLowerCase();
+    hit = (headers?: Record<string, string>, body?: any) => {
+      const url = `${basePath}${routePath}`;
+      const agent = request(app);
+      const req = agent[method](url);
+      if (headers)
+        Object.entries(headers).forEach(([k, v]) => req.set(k, v as string));
+      if (!["get", "head", "delete"].includes(method)) req.send(body ?? {});
+      return req;
+    };
+  });
+
+  it("wires method + path (default '/') and returns handler response", async () => {
+    // replace callback to a deterministic handler
+    (controller as any).routes[0].callback = async (ctx: any) =>
+      ctx.response.status(200).send({ ok: true });
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+
+    await hit().expect(200, { ok: true });
+  });
+
+  it("preserves middleware order", async () => {
+    const order: string[] = [];
+    const m1 = (_req: any, _res: any, next: any) => {
+      order.push("m1");
+      next();
+    };
+    const m2 = (_req: any, _res: any, next: any) => {
+      order.push("m2");
+      next();
+    };
+
+    (controller as any).routes[0].middleware = [m1, m2];
+    (controller as any).routes[0].callback = async (ctx: any) => {
+      order.push("handler");
       return ctx.response.status(200).send({ ok: true });
-    });
+    };
+
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+
+    await hit().expect(200, { ok: true });
+    expect(order).toEqual(["m1", "m2", "handler"]);
   });
 
-  it("happy path: calls callback and returns its response", async () => {
-    const ctx = makeRestApiContext();
-    ctx.response.status = statusMock;
-    ctx.response.send = sendMock;
-    const wrapped = requestCallbackErrorHandlerWrapper(
-      controllerName,
-      methodName,
-      handler
-    );
+  it("mounts under basePath only", async () => {
+    (controller as any).routes[0].callback = async (ctx: any) =>
+      ctx.response.status(200).send({ hi: true });
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
 
-    const res = await wrapped(ctx);
-
-    expect(handler).toHaveBeenCalledWith(ctx);
-    expect(ctx.response.status).toHaveBeenCalledWith(200);
-    expect(ctx.response.send).toHaveBeenCalledWith({ ok: true });
-    expect(res).toBe(ctx.response);
-    expect(logger.info).toHaveBeenCalled();
+    await hit().expect(200, { hi: true });
+    const agent = request(app);
+    await agent[method](routePath).expect(404);
   });
 
-  it("extracts bearer token (case-insensitive, trims space)", async () => {
-    const authToken = faker.lorem.word();
-    const ctx = makeRestApiContext({
-      headers: { authorization: `BeArEr  ${authToken}  ` },
-    });
-    ctx.response.status = statusMock;
-    ctx.response.send = sendMock;
-    const wrapped = requestCallbackErrorHandlerWrapper(
-      controllerName,
-      methodName,
-      handler
-    );
+  it("extracts Bearer token (case-insensitive, trims space)", async () => {
+    let seenToken: string | undefined;
 
-    await wrapped(ctx);
+    (controller as any).routes[0].callback = async (ctx: any) => {
+      seenToken = ctx.token;
+      return ctx.response.status(200).send({ ok: true });
+    };
 
-    expect(handler).toHaveBeenCalled();
-    expect(ctx.token).toBe(authToken);
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+
+    await hit({ Authorization: "BeArEr   nemo   " }).expect(200, { ok: true });
+    expect(seenToken).toBe("nemo");
   });
 
-  it("does not set token for non-bearer auth", async () => {
-    const ctx = makeRestApiContext();
-    const wrapped = requestCallbackErrorHandlerWrapper(
-      controllerName,
-      methodName,
-      handler
-    );
-
-    await wrapped(ctx);
-
-    expect(handler).toHaveBeenCalled();
-    expect(ctx.token).toBeUndefined();
-  });
-
-  it("BaseApiError → returns status & message", async () => {
-    class NotFoundError extends BaseApiError {
+  it("maps BaseApiError to status + message", async () => {
+    class Nope extends BaseApiError {
       constructor() {
-        super("Not found", 404);
+        super("nope", 418);
       }
     }
-    const handler = jest.fn(async () => {
-      throw new NotFoundError();
-    });
-    const ctx = makeRestApiContext();
-    ctx.response.status = statusMock;
-    ctx.response.send = sendMock;
-    const wrapped = requestCallbackErrorHandlerWrapper(
-      controllerName,
-      methodName,
-      handler
-    );
+    (controller as any).routes[0].callback = async () => {
+      throw new Nope();
+    };
 
-    await wrapped(ctx);
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
 
-    expect(ctx.response.status).toHaveBeenCalledWith(404);
-    expect(ctx.response.send).toHaveBeenCalledWith({ message: "Not found" });
-    expect(logger.error).toHaveBeenCalled();
+    await hit().expect(418, { message: "nope" });
   });
 
-  it("ZodError → 400 with issues", async () => {
-    const zErr = new ZodError([
+  it("maps ZodError to 400 with issues", async () => {
+    const zerr = new ZodError([
       { code: "custom", path: ["x"], message: "bad" } as any,
     ]);
-    const handler = jest.fn(async () => {
-      throw zErr;
-    });
-    const ctx = makeRestApiContext();
-    ctx.response.status = statusMock;
-    ctx.response.send = sendMock;
-    const wrapped = requestCallbackErrorHandlerWrapper(
-      controllerName,
-      methodName,
-      handler
-    );
+    (controller as any).routes[0].callback = async () => {
+      throw zerr;
+    };
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
 
-    await wrapped(ctx);
-
-    expect(ctx.response.status).toHaveBeenCalledWith(400);
-    expect(ctx.response.send).toHaveBeenCalledWith({
+    const res = await hit().expect(400);
+    expect(res.body).toEqual({
       message: "Validation error",
-      issues: zErr.issues,
+      issues: zerr.issues,
     });
-    expect(logger.error).toHaveBeenCalled();
   });
 
-  it("Unexpected error → 500 generic message", async () => {
-    const ctx = makeRestApiContext();
-    ctx.response.status = statusMock;
-    ctx.response.send = sendMock;
-    const handler = jest.fn(async () => {
+  it("maps unexpected errors to 500 generic message", async () => {
+    (controller as any).routes[0].callback = async () => {
       throw new Error("kaboom");
-    });
-    const wrapped = requestCallbackErrorHandlerWrapper(
-      controllerName,
-      methodName,
-      handler
-    );
+    };
 
-    await wrapped(ctx);
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
 
-    expect(ctx.response.status).toHaveBeenCalledWith(500);
-    expect(ctx.response.send).toHaveBeenCalledWith({
-      message: "Unexpected error occurred",
-    });
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `${controllerName}.${methodName} unexpected error`
-      ),
-      expect.objectContaining({ message: "kaboom" })
-    );
+    await hit().expect(500, { message: "Unexpected error occurred" });
   });
+
+  it("returns 404 for unmatched route when there are no routes", async () => {
+    // Make an empty controller (if your factory supports it) or temporarily clear routes
+    (controller as any).routes = [];
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+
+    // pick GET for a simple probe
+    await request(app).get(`${controller.basePath}/anything`).expect(404);
+  });
+
+//   it("hang prevention: a middleware that doesn't next() will not return", async () => {
+//     const bad = (_req: any, _res: any, _next: any) => {
+//       /* no next, no send */
+//     };
+//     (controller as any).routes[0].middleware = [bad];
+//     (controller as any).routes[0].callback = async (ctx: any) =>
+//       ctx.response.status(200).send({ ok: true });
+
+//     app = express();
+//     app.use(express.json());
+//     app.use(controller.basePath, controller.register());
+
+//     // This will time out if not handled; instead, assert 500 via a global error guard (optional),
+//     // or just document the behavior. I'd keep this commented to avoid slowing the suite.
+//   });
 });

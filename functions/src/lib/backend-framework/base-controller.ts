@@ -9,7 +9,7 @@ import {
 } from "./types";
 import { BaseApiError } from "../errors";
 import { RestApiContext } from "./rest-api-context";
-import { HttpMethod } from "./http";
+import { getHeader, HttpMethod } from "./http";
 import { ZodError } from "zod";
 
 export interface RequestMiddleware extends ExpressRequestHandler {
@@ -63,7 +63,7 @@ export class BaseController implements IBaseController {
         middleware = [],
         callback,
       } = route;
-      const routeHandler = requestCallbackErrorHandlerWrapper(
+      const routeHandler = requestCallbackExpressHandler(
         this.controllerName,
         methodName,
         callback
@@ -74,25 +74,56 @@ export class BaseController implements IBaseController {
   }
 }
 
+export const makeContextFromExpress = (
+  req: ExpressRequest,
+  res: ExpressResponse
+): RestApiContext => {
+  return {
+    request: req,
+    response: res,
+  };
+};
+
+export const requestCallbackExpressHandler = (
+  controllerName: string,
+  methodName: string,
+  callback: (ctx: RestApiContext) => Promise<ExpressResponse>
+): ExpressRequestHandler => {
+  const wrapped = requestCallbackErrorHandlerWrapper(
+    controllerName,
+    methodName,
+    callback
+  );
+  return async (
+    req: ExpressRequest,
+    res: ExpressResponse,
+    next: ExpressNextFunction
+  ) => {
+    try {
+      const ctx = makeContextFromExpress(req, res);
+      await wrapped(ctx);
+    } catch (err) {
+      next(err);
+    }
+  };
+};
+
 export const requestCallbackErrorHandlerWrapper = (
   controllerName: string,
   methodName: string,
   callback: RequestHandler
 ): RequestHandler => {
   return async (context: RestApiContext) => {
-    logger.info(`${controllerName}.${methodName} request`, {
-      body: context.request.body,
-      queryParams: context.request.query,
-    });
-
     try {
-      // const authHeader = context.request.header("authorization") ?? "";
-      const authHeader =
-        (typeof context.request?.header === "function"
-          ? context.request.header("authorization")
-          : undefined) ?? "";
-      if (authHeader.toLowerCase().startsWith("bearer ")) {
-        context.token = authHeader.slice("bearer ".length).trim();
+      logger.info(`${controllerName}.${methodName} request`, {
+        body: context.request.body,
+        queryParams: context.request.query,
+      });
+      
+      const authHeader = getHeader(context.request, "authorization");
+      const matchedToken = authHeader.match(/^\s*bearer\s+(.+?)\s*$/i);
+      if (matchedToken) {
+        context.token = matchedToken[1];
       }
 
       const result = await callback(context);
