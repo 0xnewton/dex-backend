@@ -2,5 +2,6 @@ export enum DBCollection {
   USERS = "users",
   /** Sub collection under users */
   REFERRALS = "referrals",
+  QUOTES = "quotes",
 }
-export type SOLANA_WALLET_ADDRESS = string;
+export type SolanaWalletAddress = string;

@@ -1,13 +1,13 @@
 import { UserDB } from "./types";
 import { getUserDoc } from "../generic";
-import { SOLANA_WALLET_ADDRESS } from "../generic/types";
+import { SolanaWalletAddress } from "../generic/types";
 
 interface CreateUserPayload {
   userID: string;
   slug: string;
   displayName: string;
   avatarUrl?: string;
-  walletAddress: SOLANA_WALLET_ADDRESS;
+  walletAddress: SolanaWalletAddress;
   privateKeyPath: string;
 }
 

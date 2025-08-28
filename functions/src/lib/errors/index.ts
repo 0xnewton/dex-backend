@@ -30,3 +30,15 @@ export class ExpiredTokenError extends BaseApiError {
     super(message, 401);
   }
 }
+
+export class BadRequestError extends BaseApiError {
+  constructor(message: string) {
+    super(message, 400);
+  }
+}
+
+export class ValidationError extends BadRequestError {
+  constructor(message: string) {
+    super(message);
+  }
+}
