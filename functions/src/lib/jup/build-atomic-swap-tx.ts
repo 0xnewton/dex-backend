@@ -84,14 +84,14 @@ export async function buildAtomicSwapTxWithFeeSplit(
     userPublicKey,
     intermediateFeeOwner,
     intermediateFeeOwnerSecretKey,
-    referrerOwner,
+    referrer, // ← optional
     coldTreasuryOwner,
     platformFeeBps,
-    referrerShareBpsOfFee = 0, // basis points of fee, i.e. 5000 = 50% of fee
     dynamicSlippage = true,
     dynamicComputeUnitLimit = true,
   } = args;
 
+  // --- validation ---
   if (quoteResponse.inputMint !== inputMint) {
     throw new ValidationError("inputMint mismatch");
   }
@@ -103,19 +103,16 @@ export async function buildAtomicSwapTxWithFeeSplit(
       `Unexpected platformFeeBps ${platformFeeBps}, must be ${DEFAULT_TOTAL_FEE_BPS}`
     );
   }
-  if (referrerShareBpsOfFee < 0 || referrerShareBpsOfFee > 10_000) {
-    throw new ValidationError(
-      "referrerShareBpsOfFee must be between 0 and 10,000"
-    );
+  if (referrer && (referrer.shareBpsOfFee < 0 || referrer.shareBpsOfFee > 10_000)) {
+    throw new ValidationError("Referrer fee must be between 0 and 10,000");
   }
   if (quoteResponse.swapMode !== "ExactIn") {
-    throw new BadRequestError(
-      "Only ExactIn supported for deterministic fee math"
-    );
+    throw new BadRequestError("Only ExactIn supported for deterministic fee math");
   }
+
   const jupiter = getJupiterClient();
 
-  // ——— SOLID INT MATH WITH BN ———
+  // --- math ---
   const inAtomsBN = new BN(inputAmountAtoms.toString());
   const feeBpsBN = new BN(platformFeeBps);
   const tenThousand = new BN(10_000);
@@ -124,74 +121,69 @@ export async function buildAtomicSwapTxWithFeeSplit(
   const feeAtomsBN = inAtomsBN.mul(feeBpsBN).div(tenThousand);
   if (feeAtomsBN.isZero()) throw new Error("Fee is zero for given amount/bps.");
 
-  // split
-  const refShareBpsBN = new BN(referrerShareBpsOfFee); // e.g. 5000 = 50% of fee
+  // referrer split (optional)
+  const refShareBpsBN = new BN(referrer?.shareBpsOfFee ?? 0);
   const refAtomsBN = feeAtomsBN.mul(refShareBpsBN).div(tenThousand);
   const sweepAtomsBN = feeAtomsBN.sub(refAtomsBN);
 
   const userPk = new PublicKey(userPublicKey);
   const feeOwnerPk = new PublicKey(intermediateFeeOwner);
-  const refPk = new PublicKey(referrerOwner);
   const coldPk = new PublicKey(coldTreasuryOwner);
   const mintPk = new PublicKey(inputMint);
 
-  // ——— PREP ATAs (payer = user; costs are user-paid in this atomic tx) ———
+  // --- ATAs (payer = user; created inside the same atomic tx) ---
   const { ata: intermediateFeeAta, ix: createIntermediateATA } =
     await maybeCreateAtaIx(connection, userPk, feeOwnerPk, mintPk);
-  const { ata: referrerAta, ix: createRefATA } = await maybeCreateAtaIx(
-    connection,
-    userPk,
-    refPk,
-    mintPk
-  );
-  const { ata: coldTreasuryAta, ix: createColdATA } = await maybeCreateAtaIx(
-    connection,
-    userPk,
-    coldPk,
-    mintPk
-  );
 
-  // ——— JUP SDK: fetch instructions (typed) ———
+  // referrer ATA only if needed
+  const refEnabled = refAtomsBN.gt(new BN(0)) && !!referrer;
+  const refPk = refEnabled ? new PublicKey(referrer!.owner) : null;
+  const { ata: referrerAta, ix: createRefATA } = refEnabled
+    ? await maybeCreateAtaIx(connection, userPk, refPk!, mintPk)
+    : { ata: null as any, ix: null as any };
+
+  // cold treasury ATA (only if we actually sweep > 0)
+  const needCold = sweepAtomsBN.gt(new BN(0));
+  const { ata: coldTreasuryAta, ix: createColdATA } = needCold
+    ? await maybeCreateAtaIx(connection, userPk, coldPk, mintPk)
+    : { ata: null as any, ix: null as any };
+
+  // --- Jupiter instructions ---
   const swapIns = await jupiter.swapInstructionsPost({
     swapRequest: {
-      quoteResponse, // ExactIn, already chosen to fee in INPUT for determinism
+      quoteResponse, // ExactIn, fee taken in INPUT mint
       userPublicKey: userPk.toBase58(),
-      feeAccount: intermediateFeeAta.toBase58(), // Jupiter deposits the fee here
+      feeAccount: intermediateFeeAta.toBase58(),
       dynamicSlippage,
       dynamicComputeUnitLimit,
     },
   });
 
-  // ——— Decode JUP instructions ———
+  // --- decode ---
   const computeBudgetIxs = (swapIns.computeBudgetInstructions || []).map(toIx);
   const setupIxs = (swapIns.setupInstructions || []).map(toIx);
   const swapIx = toIx(swapIns.swapInstruction);
-  // some deployments expose cleanupInstruction singular; handle both
-  const cleanupIxs = swapIns.cleanupInstruction
-    ? [toIx(swapIns.cleanupInstruction)]
-    : [];
+  const cleanupIxs = swapIns.cleanupInstruction ? [toIx(swapIns.cleanupInstruction)] : [];
 
-  // ——— Our transfer ixs (post-swap) ———
+  // --- our post-swap transfers ---
   const { decimals } = await getMint(connection, mintPk);
-  const refAmountBigInt = BigInt(refAtomsBN.toString());
-  const sweepAmountBigInt = BigInt(sweepAtomsBN.toString());
-
   const ourIxs: TransactionInstruction[] = [];
-  if (!refAtomsBN.isZero()) {
+
+  if (refEnabled) {
     if (createRefATA) ourIxs.push(createRefATA);
     ourIxs.push(
       createTransferCheckedInstruction(
-        intermediateFeeAta, // from
-        mintPk, // mint
-        referrerAta, // to
-        feeOwnerPk, // authority (server signer)
-        refAmountBigInt,
+        intermediateFeeAta,
+        mintPk,
+        referrerAta,
+        feeOwnerPk,
+        BigInt(refAtomsBN.toString()),
         decimals
       )
     );
   }
 
-  if (!sweepAtomsBN.isZero()) {
+  if (needCold) {
     if (createColdATA) ourIxs.push(createColdATA);
     ourIxs.push(
       createTransferCheckedInstruction(
@@ -199,13 +191,13 @@ export async function buildAtomicSwapTxWithFeeSplit(
         mintPk,
         coldTreasuryAta,
         feeOwnerPk,
-        sweepAmountBigInt,
+        BigInt(sweepAtomsBN.toString()),
         decimals
       )
     );
   }
 
-  // ——— Compose final instruction order ———
+  // --- compose order ---
   const preSwap = [
     ...computeBudgetIxs,
     ...setupIxs,
@@ -214,13 +206,12 @@ export async function buildAtomicSwapTxWithFeeSplit(
   const postSwap = [...ourIxs, ...cleanupIxs];
   const allIxs = [...preSwap, swapIx, ...postSwap];
 
-  // ——— Load ALTs Jupiter referenced ———
+  // --- ALTs ---
   const altKeys = swapIns.addressLookupTableAddresses || [];
   const alts: AddressLookupTableAccount[] = await loadALTs(connection, altKeys);
 
-  // ——— Compile v0 (payer = user) ———
-  const { blockhash, lastValidBlockHeight } =
-    await connection.getLatestBlockhash();
+  // --- compile v0 ---
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   const msgV0 = new TransactionMessage({
     payerKey: userPk,
     recentBlockhash: blockhash,
@@ -229,16 +220,15 @@ export async function buildAtomicSwapTxWithFeeSplit(
 
   const tx = new VersionedTransaction(msgV0);
 
-  // ——— Server partial-signs as fee ATA authority ———
-  // convert to a Keypair-like signer (publicKey + secretKey)
+  // --- partial sign as fee ATA authority ---
   const serverSigner = {
     publicKey: feeOwnerPk,
-    secretKey: intermediateFeeOwnerSecretKey, // Uint8Array from KMS/GSM
-  };
+    secretKey: intermediateFeeOwnerSecretKey,
+  } as any;
 
-  tx.sign([serverSigner]); // add server signature
+  tx.sign([serverSigner]);
 
-  // ——— Return base64 for client to co-sign & send ———
+  // --- return for user to co-sign & send ---
   const txBase64 = Buffer.from(tx.serialize()).toString("base64");
   return { txBase64, lastValidBlockHeight, swapIns };
 }

@@ -4,6 +4,11 @@ import {
 } from "@solana/web3.js";
 import { SolanaWalletAddress } from "../db/generic/types";
 
+interface ReferrerConfig {
+  owner: SolanaWalletAddress;
+  shareBpsOfFee: number;
+}
+
 export interface BuildAtomicArgs {
   connection: Connection;
 
@@ -16,14 +21,15 @@ export interface BuildAtomicArgs {
   userPublicKey: string;          // payer (user), signs client-side
   intermediateFeeOwner: string;   // your hot wallet (fee ATA authority)
   intermediateFeeOwnerSecretKey: Uint8Array; // server signer for fee ATA
-  referrerOwner: SolanaWalletAddress;          // receives ref share
   coldTreasuryOwner: SolanaWalletAddress;      // receives remainder
 
   // Fees
   platformFeeBps: number;         // e.g. 20 (0.20%)
-  referrerShareBpsOfFee?: number; // default 50% of fee (i.e., 10 of 20)
 
   // Jupiter API
   dynamicSlippage?: boolean;
   dynamicComputeUnitLimit?: boolean;
+
+  // Referrer
+  referrer?: ReferrerConfig;
 };
