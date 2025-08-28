@@ -10,8 +10,8 @@ export interface ReferralDB {
   id: ReferralID;
   userID: UserID;
   slug: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: FirebaseFirestore.Timestamp;
+  updatedAt: FirebaseFirestore.Timestamp;
   feeBps: number;
   splitBps: FeeSplitBps;
   isActive: boolean;

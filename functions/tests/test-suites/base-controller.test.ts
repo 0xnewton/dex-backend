@@ -5,6 +5,7 @@ import { BaseController, IRouteMeta } from "../../src/lib/backend-framework";
 import { BaseApiError } from "../../src/lib/errors";
 import { makeController, TestControllerBase } from "../factories/controller";
 import { makeRandomRoute, RandomRoute } from "../factories/route";
+import { faker } from "@faker-js/faker";
 
 // silence logs
 jest.mock("firebase-functions", () => ({
@@ -25,7 +26,7 @@ describe("BaseController.register()", () => {
     controller = makeController(routeDefinition.def) as any;
 
     // cache route info for convenience
-    const meta = (controller as any).routes[0] as IRouteMeta;
+    const meta = controller.routes[0] as IRouteMeta;
     basePath = controller.basePath;
     routePath = meta.path ?? "/";
     method = (meta.method ?? "get").toLowerCase();
@@ -42,7 +43,7 @@ describe("BaseController.register()", () => {
 
   it("wires method + path (default '/') and returns handler response", async () => {
     // replace callback to a deterministic handler
-    (controller as any).routes[0].callback = async (ctx: any) =>
+    controller.routes[0].callback = async (ctx: any) =>
       ctx.response.status(200).send({ ok: true });
     app = express();
     app.use(express.json());
@@ -62,8 +63,8 @@ describe("BaseController.register()", () => {
       next();
     };
 
-    (controller as any).routes[0].middleware = [m1, m2];
-    (controller as any).routes[0].callback = async (ctx: any) => {
+    controller.routes[0].middleware = [m1, m2];
+    controller.routes[0].callback = async (ctx: any) => {
       order.push("handler");
       return ctx.response.status(200).send({ ok: true });
     };
@@ -77,7 +78,7 @@ describe("BaseController.register()", () => {
   });
 
   it("mounts under basePath only", async () => {
-    (controller as any).routes[0].callback = async (ctx: any) =>
+    controller.routes[0].callback = async (ctx: any) =>
       ctx.response.status(200).send({ hi: true });
     app = express();
     app.use(express.json());
@@ -85,13 +86,13 @@ describe("BaseController.register()", () => {
 
     await hit().expect(200, { hi: true });
     const agent = request(app);
-    await agent[method](routePath).expect(404);
+    await agent[method]("/"+faker.lorem.word()).expect(404);
   });
 
   it("extracts Bearer token (case-insensitive, trims space)", async () => {
     let seenToken: string | undefined;
 
-    (controller as any).routes[0].callback = async (ctx: any) => {
+    controller.routes[0].callback = async (ctx: any) => {
       seenToken = ctx.token;
       return ctx.response.status(200).send({ ok: true });
     };
@@ -110,7 +111,7 @@ describe("BaseController.register()", () => {
         super("nope", 418);
       }
     }
-    (controller as any).routes[0].callback = async () => {
+    controller.routes[0].callback = async () => {
       throw new Nope();
     };
 
@@ -125,7 +126,7 @@ describe("BaseController.register()", () => {
     const zerr = new ZodError([
       { code: "custom", path: ["x"], message: "bad" } as any,
     ]);
-    (controller as any).routes[0].callback = async () => {
+    controller.routes[0].callback = async () => {
       throw zerr;
     };
     app = express();
@@ -140,7 +141,7 @@ describe("BaseController.register()", () => {
   });
 
   it("maps unexpected errors to 500 generic message", async () => {
-    (controller as any).routes[0].callback = async () => {
+    controller.routes[0].callback = async () => {
       throw new Error("kaboom");
     };
 
@@ -153,7 +154,7 @@ describe("BaseController.register()", () => {
 
   it("returns 404 for unmatched route when there are no routes", async () => {
     // Make an empty controller (if your factory supports it) or temporarily clear routes
-    (controller as any).routes = [];
+    controller.routes = [];
     app = express();
     app.use(express.json());
     app.use(controller.basePath, controller.register());
@@ -166,8 +167,8 @@ describe("BaseController.register()", () => {
 //     const bad = (_req: any, _res: any, _next: any) => {
 //       /* no next, no send */
 //     };
-//     (controller as any).routes[0].middleware = [bad];
-//     (controller as any).routes[0].callback = async (ctx: any) =>
+//     controller.routes[0].middleware = [bad];
+//     controller.routes[0].callback = async (ctx: any) =>
 //       ctx.response.status(200).send({ ok: true });
 
 //     app = express();

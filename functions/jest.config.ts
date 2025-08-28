@@ -16,6 +16,8 @@ const config: Config = {
     '^(\\.{1,2}/.*)\\.js$': '$1', // ESM path fix
     '^@/(.*)$': '<rootDir>/src/$1',
   },
+  globalSetup: "./tests/setup/setup-db.ts",
+  globalTeardown: "./tests/setup/teardown.ts"
 };
 
 export default config;

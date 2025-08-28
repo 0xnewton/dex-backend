@@ -2,6 +2,7 @@ import { UserID } from "../users/types";
 import { FeeSplitBps } from "./types";
 import { getNewReferralDoc } from "../generic";
 import { ReferralDB } from "./types";
+import { Timestamp } from "firebase-admin/firestore";
 
 export interface CreateReferralPayload {
   userID: UserID;
@@ -16,7 +17,7 @@ export const createReferral = async (
   payload: CreateReferralPayload
 ): Promise<ReferralDB> => {
   const referralDoc = getNewReferralDoc(payload.userID);
-  const timestamp = new Date();
+  const timestamp = Timestamp.now()
   const referralData: ReferralDB = {
     id: referralDoc.id,
     userID: payload.userID,
