@@ -1,4 +1,4 @@
-import { buildAtomicSwapTxWithFeeSplit } from "../../src/lib/jup/build-atomic-swap-tx";
+import { buildAtomicSwapTxWithFeeSplit } from "../../src/lib/jup";
 import { DEFAULT_TOTAL_FEE_BPS } from "../../src/lib/constants";
 import { makeJupQuote } from "../factories/quotes";
 import { faker } from "@faker-js/faker";
