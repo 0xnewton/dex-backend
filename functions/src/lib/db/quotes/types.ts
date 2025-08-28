@@ -1,25 +1,21 @@
 import { QuoteResponse } from "@jup-ag/api";
 import { Timestamp } from "firebase-admin/firestore";
 import { ReferralID } from "../referrals";
+import { UserID } from "../users";
 
 export type QuoteID = string;
 
-export interface QuoteDB {
+export interface QuoteWithoutReferralDB {
   id: QuoteID;
   timestamp: Timestamp; // issuedAt
   expiresAt: Timestamp; // TTL
-  //   status: "active" | "built" | "expired";
-
-  // Bind to user & policy
   userPublicKey: string;
   platformFeeBps: number;
-  referralId: ReferralID | null;
+  referralId: string | null;
   referralSlug: string | null;
   referralUserId: string | null;
   swapMode: "ExactIn";
   dynamicSlippage: boolean;
-
-  // Params snapshot (strings to avoid bigint issues)
   inputMint: string;
   outputMint: string;
   amount: string;
@@ -27,3 +23,11 @@ export interface QuoteDB {
 
   quote: QuoteResponse;
 }
+
+export interface QuoteWithReferralDB extends Omit<QuoteWithoutReferralDB, "referralId" | "referralSlug" | "referralUserId"> {
+    referralId: ReferralID;
+    referralSlug: string;
+    referralUserId: UserID;
+}
+
+export type QuoteDB = QuoteWithoutReferralDB | QuoteWithReferralDB;

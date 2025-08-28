@@ -4,6 +4,8 @@ import { getJupiterClient } from "../../lib/jup/client";
 import { createQuote, QuoteDB } from "../../lib/db/quotes";
 import { NotFoundError } from "../../lib/errors";
 import { DEFAULT_TOTAL_FEE_BPS } from "../../lib/constants";
+import { logger } from "firebase-functions";
+import { QuoteGetRequest } from "@jup-ag/api";
 
 const DEFAULT_SWAP_MODE = "ExactIn"; // Only ExactIn supported for now due to fee math
 
@@ -28,6 +30,7 @@ export type GetAndStoreQuoteFunction = (
 export const getAndStoreQuote: GetAndStoreQuoteFunction = async (
   payload: GetAndStoreQuotePayload
 ) => {
+  logger.info("getAndStoreQuote called with payload", payload);
   const client = getJupiterClient();
 
   let referral: ReferralDB | null = null;
@@ -43,7 +46,7 @@ export const getAndStoreQuote: GetAndStoreQuoteFunction = async (
   const platformFeeBps = referral?.feeBps ?? DEFAULT_TOTAL_FEE_BPS;
 
   // Fetch quote from Jupiter
-  const quote = await client.quoteGet({
+  const quoteBody: QuoteGetRequest = {
     inputMint: payload.inputMint,
     outputMint: payload.outputMint,
     amount: payload.amount,
@@ -51,7 +54,9 @@ export const getAndStoreQuote: GetAndStoreQuoteFunction = async (
     platformFeeBps,
     swapMode: DEFAULT_SWAP_MODE,
     dynamicSlippage: payload.dynamicSlippage,
-  });
+  }
+  logger.info("Fetching quote from Jupiter with params:", quoteBody);
+  const quote = await client.quoteGet(quoteBody);
 
   // Store quote in DB
   const quoteDB = await createQuote({

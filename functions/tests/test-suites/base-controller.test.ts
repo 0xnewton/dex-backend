@@ -7,11 +7,6 @@ import { makeController, TestControllerBase } from "../factories/controller";
 import { makeRandomRoute, RandomRoute } from "../factories/route";
 import { faker } from "@faker-js/faker";
 
-// silence logs
-jest.mock("firebase-functions", () => ({
-  logger: { info: jest.fn(), error: jest.fn() },
-}));
-
 describe("BaseController.register()", () => {
   let controller: TestControllerBase & BaseController;
   let routeDefinition: RandomRoute<any>;

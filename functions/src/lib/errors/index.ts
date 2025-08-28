@@ -42,3 +42,9 @@ export class ValidationError extends BadRequestError {
     super(message);
   }
 }
+
+export class ResourceExpiredError extends BaseApiError {
+  constructor(message: string) {
+    super(message, 410);
+  }
+}

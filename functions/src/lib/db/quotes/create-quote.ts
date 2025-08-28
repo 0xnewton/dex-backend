@@ -3,6 +3,7 @@ import { getNewQuoteDoc } from "../generic";
 import { QuoteDB } from "./types";
 import { Timestamp } from "firebase-admin/firestore";
 import { ReferralID } from "../referrals";
+import { logger } from "firebase-functions";
 
 interface CreateQuotePayload {
   userPublicKey: string;
@@ -24,6 +25,7 @@ interface CreateQuotePayload {
 export const createQuote = async (
   payload: CreateQuotePayload
 ): Promise<QuoteDB> => {
+  logger.info("Creating quote with payload", payload);
   const doc = getNewQuoteDoc();
   const now = Timestamp.now();
   const data: QuoteDB = {
