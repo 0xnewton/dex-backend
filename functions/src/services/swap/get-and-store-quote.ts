@@ -7,7 +7,7 @@ import { DEFAULT_TOTAL_FEE_BPS } from "../../lib/constants";
 
 const DEFAULT_SWAP_MODE = "ExactIn"; // Only ExactIn supported for now due to fee math
 
-interface GetAndStoreQuotePayload {
+export interface GetAndStoreQuotePayload {
   referralSlug?: string;
   userPublicKey: SolanaWalletAddress;
   inputMint: string;
@@ -17,7 +17,7 @@ interface GetAndStoreQuotePayload {
   dynamicSlippage: boolean;
 }
 
-interface GetAndStoreQuoteResponse {
+export interface GetAndStoreQuoteResponse {
   quote: QuoteDB;
 }
 
