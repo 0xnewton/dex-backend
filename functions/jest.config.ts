@@ -17,7 +17,8 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   globalSetup: "./tests/setup/setup-db.ts",
-  globalTeardown: "./tests/setup/teardown.ts"
+  globalTeardown: "./tests/setup/teardown.ts",
+  setupFilesAfterEnv: ['./tests/setup/jest-setup.ts'],
 };
 
 export default config;
