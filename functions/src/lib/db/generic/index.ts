@@ -5,6 +5,9 @@ import { UserDB } from "../users/types";
 import { ReferralDB } from "../referrals/types";
 import { QuoteDB } from "../quotes/types";
 
+export * from "./types";
+export * from "./validators";
+
 export const getUserCollection = () =>
   db.collection(DBCollection.USERS) as CollectionReference<UserDB>;
 export const getUserDoc = (userID: string) => getUserCollection().doc(userID);

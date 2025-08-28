@@ -1,10 +1,6 @@
 import { UserID } from "../users/types";
 
 export type ReferralID = string;
-export interface FeeSplitBps {
-  referrer: number;
-  treasury: number;
-}
 
 export interface ReferralDB {
   id: ReferralID;
@@ -12,8 +8,10 @@ export interface ReferralDB {
   slug: string;
   createdAt: FirebaseFirestore.Timestamp;
   updatedAt: FirebaseFirestore.Timestamp;
+  /** bps of trade (e.g., 30 = 0.3%) */
   feeBps: number;
-  feeSplitBps: FeeSplitBps;
+  /** bps of fee (0..10_000) (e.g., 5000 for 50/50) */
+  referrerShareBpsOfFee: number;
   isActive: boolean;
   description: string | null;
   deletedAt: FirebaseFirestore.Timestamp | null;

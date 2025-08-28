@@ -4,7 +4,7 @@ import {
 } from "../../src/services/referrals/create-referral";
 import { AlreadyExistsError } from "../../src/lib/errors";
 import {
-  DEFAULT_REFERRAL_FEE_SPLIT,
+  DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
   DEFAULT_TOTAL_FEE_BPS,
 } from "../../src/lib/constants";
 import type { UserDB } from "../../src/lib/db/users/types";
@@ -72,11 +72,11 @@ describe("createReferral service", () => {
       description: referralPayload.description,
       isActive: referralPayload.isActive ?? true, // defaults to true
       feeBps: DEFAULT_TOTAL_FEE_BPS,
-      feeSplitBps: DEFAULT_REFERRAL_FEE_SPLIT,
+      referrerShareBpsOfFee: DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
     });
     expect(result.isActive).toBe(referral.isActive);
     expect(result.feeBps).toBe(referral.feeBps);
-    expect(result.feeSplitBps).toEqual(referral.feeSplitBps);
+    expect(result.referrerShareBpsOfFee).toEqual(referral.referrerShareBpsOfFee);
   });
 
   it("throws AlreadyExistsError when slug already exists", async () => {
@@ -166,7 +166,7 @@ describe("createReferral service", () => {
     expect(createReferralInDB).toHaveBeenCalledWith(
       expect.objectContaining({
         feeBps: DEFAULT_TOTAL_FEE_BPS,
-        feeSplitBps: DEFAULT_REFERRAL_FEE_SPLIT,
+        referrerShareBpsOfFee: DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
       })
     );
   });

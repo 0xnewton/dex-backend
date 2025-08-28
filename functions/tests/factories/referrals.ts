@@ -11,11 +11,8 @@ export const makeReferral = (
     slug: faker.helpers.slugify(faker.lorem.word()),
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
-    feeBps: faker.datatype.number({ min: 0, max: 100 }),
-    feeSplitBps: {
-      referrer: faker.datatype.number({ min: 0, max: 100 }),
-      treasury: faker.datatype.number({ min: 0, max: 100 }),
-    },
+    feeBps: faker.datatype.number({ min: 0, max: 10000 }),
+    referrerShareBpsOfFee: faker.datatype.number({ min: 0, max: 10000 }),
     isActive: faker.datatype.boolean(),
     description: faker.lorem.sentence(),
     deletedAt: null,

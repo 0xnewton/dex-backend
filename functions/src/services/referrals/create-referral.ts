@@ -7,7 +7,7 @@ import { AlreadyExistsError } from "../../lib/errors";
 import { makeSlug } from "../../lib/slugs";
 import { createReferral as createReferralInDB } from "../../lib/db/referrals";
 import {
-  DEFAULT_REFERRAL_FEE_SPLIT,
+  DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
   DEFAULT_TOTAL_FEE_BPS,
 } from "../../lib/constants";
 
@@ -42,7 +42,7 @@ export const createReferral: CreateReferralFunction = async (payload) => {
     description: payload.description,
     isActive: payload.isActive ?? true,
     feeBps: DEFAULT_TOTAL_FEE_BPS,
-    feeSplitBps: DEFAULT_REFERRAL_FEE_SPLIT,
+    referrerShareBpsOfFee: DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
   });
 
   return referral;
