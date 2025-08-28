@@ -34,11 +34,24 @@ export function makeMockRequest(init?: {
   query?: any;
   headers?: Record<string, string>;
 }): Request {
+// normalize lookups to be case-insensitive
+  const lookupHeader = (name: string) => {
+    if (!init?.headers) return undefined;
+    const keyLower = name.toLowerCase();
+    // allow both lower/upper keys and arrays
+    const val =
+      (init?.headers as any)[name] ??
+      (init?.headers as any)[keyLower];
+    if (Array.isArray(val)) return val[0];
+    return val;
+  };
+
   const req: Partial<Request> = {
     body: init?.body,
     params: init?.params,
     query: init?.query,
     headers: init?.headers || {},
+    header: lookupHeader,
   };
   return req as Request;
 }

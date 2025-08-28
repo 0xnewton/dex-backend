@@ -74,7 +74,7 @@ export class BaseController implements IBaseController {
   }
 }
 
-const requestCallbackErrorHandlerWrapper = (
+export const requestCallbackErrorHandlerWrapper = (
   controllerName: string,
   methodName: string,
   callback: RequestHandler
@@ -86,7 +86,11 @@ const requestCallbackErrorHandlerWrapper = (
     });
 
     try {
-      const authHeader = context.request.header("authorization") ?? "";
+      // const authHeader = context.request.header("authorization") ?? "";
+      const authHeader =
+        (typeof context.request?.header === "function"
+          ? context.request.header("authorization")
+          : undefined) ?? "";
       if (authHeader.toLowerCase().startsWith("bearer ")) {
         context.token = authHeader.slice("bearer ".length).trim();
       }

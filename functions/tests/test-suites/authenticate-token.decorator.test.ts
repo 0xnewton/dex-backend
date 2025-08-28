@@ -15,7 +15,7 @@ import {
 } from "../factories/controller";
 import { faker } from "@faker-js/faker";
 
-// Convenience: extend our RestApiContext mock with token
+// extend our RestApiContext mock with token
 function ctxWithToken(
   token: string,
   init?: Parameters<typeof makeRestApiContext>[0]
@@ -37,6 +37,7 @@ describe("AuthenticateToken decorator", () => {
   let mockUserId: string;
 
   beforeEach(() => {
+    jest.restoreAllMocks();
     token = faker.lorem.word();
     user = makeUser();
     mockUserId = user.id;
@@ -50,10 +51,6 @@ describe("AuthenticateToken decorator", () => {
     getUserByIDMock.mockResolvedValue(user);
     logSpy = jest.spyOn(logger, "info").mockImplementation(() => {});
     errorLogSpy = jest.spyOn(logger, "error").mockImplementation(() => {})
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
   });
 
   it("happy path: verifies token, loads user, populates claims, preserves this & args", async () => {
