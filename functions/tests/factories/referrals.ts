@@ -12,7 +12,7 @@ export const makeReferral = (
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
     feeBps: faker.datatype.number({ min: 0, max: 100 }),
-    splitBps: {
+    feeSplitBps: {
       referrer: faker.datatype.number({ min: 0, max: 100 }),
       treasury: faker.datatype.number({ min: 0, max: 100 }),
     },
