@@ -11,7 +11,7 @@ import {
   DEFAULT_TOTAL_FEE_BPS,
 } from "../../lib/constants";
 
-interface CreateReferralServiceRequest {
+export interface CreateReferralServiceRequest {
   userID: UserID;
   slug?: string;
   description?: string;
@@ -29,7 +29,7 @@ export const createReferral: CreateReferralFunction = async (payload) => {
     slug = await generateSlugFromUser(user);
   }
   // Ensure slug is globally unique
-  const existingReferral = await getReferralBySlug(user.id);
+  const existingReferral = await getReferralBySlug(slug);
   if (existingReferral) {
     throw new AlreadyExistsError(
       `Referral with slug ${slug} already exists for user ${user.id}`
@@ -40,7 +40,7 @@ export const createReferral: CreateReferralFunction = async (payload) => {
     userID: user.id,
     slug,
     description: payload.description,
-    isActive: true,
+    isActive: payload.isActive ?? true,
     feeBps: DEFAULT_TOTAL_FEE_BPS,
     feeSplitBps: DEFAULT_REFERRAL_FEE_SPLIT,
   });

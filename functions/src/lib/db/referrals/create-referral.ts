@@ -25,7 +25,7 @@ export const createReferral = async (
     createdAt: timestamp,
     updatedAt: timestamp,
     feeBps: payload.feeBps,
-    splitBps: payload.feeSplitBps,
+    feeSplitBps: payload.feeSplitBps,
     isActive: payload.isActive,
     description: payload.description ?? null,
     deletedAt: null,

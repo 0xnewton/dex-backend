@@ -13,7 +13,7 @@ export interface ReferralDB {
   createdAt: FirebaseFirestore.Timestamp;
   updatedAt: FirebaseFirestore.Timestamp;
   feeBps: number;
-  splitBps: FeeSplitBps;
+  feeSplitBps: FeeSplitBps;
   isActive: boolean;
   description: string | null;
   deletedAt: FirebaseFirestore.Timestamp | null;
