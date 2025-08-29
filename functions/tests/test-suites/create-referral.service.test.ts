@@ -2,7 +2,7 @@ import {
   createReferral,
   CreateReferralServiceRequest,
 } from "../../src/services/referrals/create-referral";
-import { AlreadyExistsError } from "../../src/lib/backend-framework";
+import { AlreadyExistsError, NotFoundError } from "../../src/lib/backend-framework";
 import {
   DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
   DEFAULT_TOTAL_FEE_BPS,
@@ -79,6 +79,18 @@ describe("createReferral service", () => {
     expect(result.referrerShareBpsOfFee).toEqual(
       referral.referrerShareBpsOfFee
     );
+  });
+
+  it("throws NotFoundError when userID does not exist", async () => {
+    (getUserByID as jest.Mock).mockResolvedValue(null);
+    
+    await expect(createReferral(referralPayload)).rejects.toBeInstanceOf(
+      NotFoundError
+    );
+
+    expect(getUserByID).toHaveBeenCalledWith(user.id);
+    expect(getReferralBySlug).not.toHaveBeenCalled();
+    expect(createReferralInDB).not.toHaveBeenCalled();
   });
 
   it("throws AlreadyExistsError when slug already exists", async () => {

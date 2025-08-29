@@ -3,7 +3,7 @@ import { getReferralCountForUser } from "../../lib/db/referrals";
 import { ReferralDB } from "../../lib/db/referrals/types";
 import { getUserByID } from "../../lib/db/users";
 import { UserDB, UserID } from "../../lib/db/users/types";
-import { AlreadyExistsError } from "../../lib/backend-framework/errors";
+import { AlreadyExistsError, NotFoundError } from "../../lib/backend-framework/errors";
 import { makeSlug } from "../../lib/slugs";
 import { createReferral as createReferralInDB } from "../../lib/db/referrals";
 import {
@@ -24,6 +24,9 @@ export type CreateReferralFunction = (
 
 export const createReferral: CreateReferralFunction = async (payload) => {
   const user = await getUserByID(payload.userID);
+  if (!user) {
+    throw new NotFoundError(`User with ID ${payload.userID} not found`);
+  }
   let slug = payload.slug;
   if (!slug) {
     slug = await generateSlugFromUser(user);

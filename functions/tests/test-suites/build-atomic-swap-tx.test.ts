@@ -3,6 +3,7 @@ import { DEFAULT_TOTAL_FEE_BPS } from "../../src/lib/config/constants";
 import { makeJupQuote } from "../factories/quotes";
 import { faker } from "@faker-js/faker";
 import BN from "bn.js";
+import { Keypair } from "@solana/web3.js";
 const {
   PublicKey,
   VersionedTransaction,
@@ -10,14 +11,16 @@ const {
 } = require("@solana/web3.js");
 
 // ---------- Helpers ----------
-const BASE58 = "11111111111111111111111111111111";
+const BASE58 = Keypair.generate().publicKey.toString();
 const asB64 = (s: string) => Buffer.from(s, "utf8").toString("base64");
 
 // ---------- Mocks ----------
 
 jest.mock("@solana/web3.js", () => {
+  const actual = jest.requireActual("@solana/web3.js");
+
   const toStr = (v: string | Uint8Array) =>
-    typeof v === "string" ? v : "B58_" + Buffer.from(v).toString("hex"); // stable string
+    typeof v === "string" ? v : "B58_" + Buffer.from(v).toString("hex"); // human/stable
 
   class PublicKey {
     private _b58: string;
@@ -25,7 +28,13 @@ jest.mock("@solana/web3.js", () => {
       this._b58 = toStr(v);
     }
     toBase58() {
-      return this._b58; // ALWAYS string
+      return this._b58;
+    }
+    toString() {
+      return this._b58;
+    }
+    equals(other: any) {
+      return !!other?.toBase58 && other.toBase58() === this._b58;
     }
   }
 
@@ -39,6 +48,7 @@ jest.mock("@solana/web3.js", () => {
       this.data = opts.data;
     }
   }
+
   class TransactionMessage {
     payerKey: any;
     recentBlockhash: string;
@@ -52,6 +62,7 @@ jest.mock("@solana/web3.js", () => {
       return { compiled: true, instructions: this.instructions };
     }
   }
+
   class VersionedTransaction {
     static __signSpy = jest.fn();
     static __serializeSpy = jest.fn(() => Buffer.from("cafebabe", "utf8"));
@@ -63,16 +74,39 @@ jest.mock("@solana/web3.js", () => {
       return VersionedTransaction.__serializeSpy();
     }
   }
+
   class AddressLookupTableAccount {}
   class Connection {}
 
+  // Simple deterministic Keypair for tests
+  class Keypair {
+    public publicKey: PublicKey;
+    public secretKey: Uint8Array;
+    constructor(secret?: Uint8Array) {
+      this.secretKey =
+        secret ??
+        Uint8Array.from({ length: 64 }, () => Math.floor(Math.random() * 256));
+      // derive a display pk from secret for equality checks
+      const hex = Buffer.from(this.secretKey).toString("hex").slice(0, 64);
+      this.publicKey = new PublicKey("KP_" + hex);
+    }
+    static generate() {
+      return new Keypair();
+    }
+    static fromSecretKey(sk: Uint8Array) {
+      return new Keypair(sk);
+    }
+  }
+
   return {
+    ...actual,
     PublicKey,
     TransactionInstruction,
     TransactionMessage,
     VersionedTransaction,
     AddressLookupTableAccount,
     Connection,
+    Keypair,
   };
 });
 
@@ -171,12 +205,14 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   let refATA: string;
   let coldATA: string;
   let connection: MockConnection;
+  let feeWallet: Keypair;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    feeWallet = new Keypair();
     inAmount = faker.datatype.number({ min: 1_000, max: 1_000_000 }).toString();
     USER = pkFromSeed(1).toBase58();
-    FEE_OWNER = pkFromSeed(2).toBase58();
+    FEE_OWNER = feeWallet.publicKey.toString();
     REF_OWNER = pkFromSeed(3).toBase58();
     COLD_OWNER = pkFromSeed(4).toBase58();
     MINT = pkFromSeed(5).toBase58();
@@ -269,7 +305,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         inputAmountAtoms: inAmount,
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
-        intermediateFeeOwnerSecretKey: new Uint8Array(64),
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
           shareBpsOfFee: 5000,
@@ -295,7 +331,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         inputAmountAtoms: faker.random.numeric(3), // mismatch
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
-        intermediateFeeOwnerSecretKey: new Uint8Array(64),
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
           shareBpsOfFee: 5000,
@@ -317,7 +353,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         inputAmountAtoms: inAmount,
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
-        intermediateFeeOwnerSecretKey: new Uint8Array(64),
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
           shareBpsOfFee: 5000,
@@ -341,7 +377,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         inputAmountAtoms: inAmount,
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
-        intermediateFeeOwnerSecretKey: new Uint8Array(64),
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
           shareBpsOfFee: -1 * faker.datatype.number({ min: 1, max: 10000 }),
@@ -363,7 +399,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         inputAmountAtoms: inAmount,
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
-        intermediateFeeOwnerSecretKey: new Uint8Array(64),
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
           shareBpsOfFee: 10000 + faker.datatype.number({ min: 1, max: 10000 }),
@@ -389,7 +425,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         inputAmountAtoms: inAmount,
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
-        intermediateFeeOwnerSecretKey: new Uint8Array(64),
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
           shareBpsOfFee: 5000,
@@ -413,7 +449,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         inputAmountAtoms: tinyAmount,
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
-        intermediateFeeOwnerSecretKey: new Uint8Array(64),
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
           shareBpsOfFee: 5000,
@@ -431,7 +467,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
     // Quote and args
     const refShareBpsOfFee = faker.datatype.number({ min: 100, max: 9000 });
     const quote = makeJupQuote({ inAmount, inputMint: MINT });
-    const secret = new Uint8Array(64).fill(7);
+    const secret = Uint8Array.from(feeWallet.secretKey);
 
     const { txBase64, lastValidBlockHeight, swapIns } =
       await buildAtomicSwapTxWithFeeSplit({
@@ -512,7 +548,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inputAmountAtoms: inAmount,
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
-      intermediateFeeOwnerSecretKey: new Uint8Array(64),
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
         shareBpsOfFee: 0,
@@ -547,7 +583,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inputAmountAtoms: inAmount,
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
-      intermediateFeeOwnerSecretKey: new Uint8Array(64),
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
         shareBpsOfFee: 10_000,
@@ -589,7 +625,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inputAmountAtoms: inAmount,
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
-      intermediateFeeOwnerSecretKey: new Uint8Array(64),
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
         shareBpsOfFee: 0,
@@ -626,7 +662,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inputAmountAtoms: inAmount,
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
-      intermediateFeeOwnerSecretKey: new Uint8Array(64),
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
         shareBpsOfFee: 5000,
@@ -660,7 +696,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inputAmountAtoms: inAmount,
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
-      intermediateFeeOwnerSecretKey: new Uint8Array(64),
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
         shareBpsOfFee: 5000,
@@ -684,7 +720,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inputAmountAtoms: inAmount,
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
-      intermediateFeeOwnerSecretKey: new Uint8Array(64),
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
         shareBpsOfFee: 1234,
@@ -714,7 +750,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inputAmountAtoms: "1000",
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
-      intermediateFeeOwnerSecretKey: new Uint8Array(64),
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
         shareBpsOfFee: tinyShare,
@@ -769,7 +805,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         inputAmountAtoms: amount,
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
-        intermediateFeeOwnerSecretKey: new Uint8Array(64),
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
           shareBpsOfFee: refShare,
@@ -817,5 +853,102 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         expect(decimals).toBe(6);
       }
     }
+  });
+
+  it("throws when intermediateFeeOwnerSecretKey does not match intermediateFeeOwner", async () => {
+    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+
+    // make a mismatching secret (different from feeWallet.secretKey)
+    const wrongSecret = new Uint8Array(64).fill(9);
+
+    await expect(
+      buildAtomicSwapTxWithFeeSplit({
+        connection: connection as any,
+        quoteResponse: quote,
+        inputMint: MINT,
+        inputAmountAtoms: inAmount,
+        userPublicKey: USER,
+        intermediateFeeOwner: FEE_OWNER, // from feeWallet
+        intermediateFeeOwnerSecretKey: wrongSecret, // does NOT match feeWallet
+        referrer: { owner: REF_OWNER, shareBpsOfFee: 5000 },
+        coldTreasuryOwner: COLD_OWNER,
+        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      })
+    ).rejects.toThrow(
+      "intermediateFeeOwnerSecretKey does not match intermediateFeeOwner"
+    );
+  });
+
+  it('throws "Expected cold treasury ATA to be defined" when getAssociatedTokenAddress returns null for cold', async () => {
+    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+
+    // Order of calls in your function (with no referrer): intermediate → cold
+    // 1st call (intermediate): return deterministic ATA
+    getAssociatedTokenAddressMock
+      .mockImplementationOnce((_mint, owner) => {
+        const ownerPk =
+          typeof owner === "object" ? owner : new PublicKey(owner);
+        const mintPk = typeof _mint === "object" ? _mint : new PublicKey(_mint);
+        return ataFromOwner(ownerPk, mintPk);
+      })
+      // 2nd call (cold): force null to trigger the throw
+      .mockImplementationOnce(() => null as any)
+      // subsequent calls (if any): revert to default deterministic impl
+      .mockImplementation((_mint, owner) => {
+        const ownerPk =
+          typeof owner === "object" ? owner : new PublicKey(owner);
+        const mintPk = typeof _mint === "object" ? _mint : new PublicKey(_mint);
+        return ataFromOwner(ownerPk, mintPk);
+      });
+
+    await expect(
+      buildAtomicSwapTxWithFeeSplit({
+        connection: connection as any,
+        quoteResponse: quote,
+        inputMint: MINT,
+        inputAmountAtoms: inAmount,
+        userPublicKey: USER,
+        intermediateFeeOwner: FEE_OWNER,
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+        // no referrer -> needCold = true -> 2nd ATA call is cold
+        coldTreasuryOwner: COLD_OWNER,
+        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      })
+    ).rejects.toThrow("Expected cold treasury ATA to be defined");
+  });
+
+  it('throws "Expected referrer ATA to be defined" when getAssociatedTokenAddress returns null for referrer', async () => {
+    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+
+    // Order with referrer present: intermediate → referrer → cold
+    getAssociatedTokenAddressMock
+      .mockImplementationOnce((_mint, owner) => {
+        const ownerPk =
+          typeof owner === "object" ? owner : new PublicKey(owner);
+        const mintPk = typeof _mint === "object" ? _mint : new PublicKey(_mint);
+        return ataFromOwner(ownerPk, mintPk);
+      })
+      .mockImplementationOnce(() => null as any) // referrer ATA missing
+      .mockImplementation((_mint, owner) => {
+        const ownerPk =
+          typeof owner === "object" ? owner : new PublicKey(owner);
+        const mintPk = typeof _mint === "object" ? _mint : new PublicKey(_mint);
+        return ataFromOwner(ownerPk, mintPk);
+      });
+
+    await expect(
+      buildAtomicSwapTxWithFeeSplit({
+        connection: connection as any,
+        quoteResponse: quote,
+        inputMint: MINT,
+        inputAmountAtoms: inAmount,
+        userPublicKey: USER,
+        intermediateFeeOwner: FEE_OWNER,
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+        referrer: { owner: REF_OWNER, shareBpsOfFee: 5000 },
+        coldTreasuryOwner: COLD_OWNER,
+        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      })
+    ).rejects.toThrow("Expected referrer ATA to be defined");
   });
 });
