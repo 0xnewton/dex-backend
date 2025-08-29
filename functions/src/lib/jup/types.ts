@@ -4,7 +4,7 @@ import {
 } from "@solana/web3.js";
 import { SolanaWalletAddress } from "../db/generic/types";
 
-interface ReferrerConfig {
+export interface ReferrerConfig {
   owner: SolanaWalletAddress;
   shareBpsOfFee: number;
 }

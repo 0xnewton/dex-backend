@@ -8,8 +8,7 @@ describe("createReferral", () => {
   let createMock: jest.Mock;
   let getNewReferralDocMock: jest.Mock;
   let referral: ReferralDB;
-  let Errors: typeof import("../../src/lib/errors");
-
+  let Errors: typeof import("../../src/lib/backend-framework/errors");
 
   // function under test will be imported after mocks are set
   let createReferral: (typeof import("../../src/lib/db/referrals/create-referral"))["createReferral"];
@@ -49,7 +48,7 @@ describe("createReferral", () => {
 
     // Load module under test AFTER mocks, using CommonJS require
     jest.isolateModules(() => {
-      Errors = require("../../src/lib/errors");
+      Errors = require("../../src/lib/backend-framework/errors");
       ({
         createReferral,
       } = require("../../src/lib/db/referrals/create-referral"));
@@ -107,7 +106,11 @@ describe("createReferral", () => {
     ).rejects.toBeInstanceOf(Errors.ValidationError);
 
     await expect(
-      createReferral({ ...payload, feeBps: 0, referrerShareBpsOfFee: faker.datatype.number({min: 2, max: 10000}) })
+      createReferral({
+        ...payload,
+        feeBps: 0,
+        referrerShareBpsOfFee: faker.datatype.number({ min: 2, max: 10000 }),
+      })
     ).rejects.toBeInstanceOf(Errors.ValidationError);
   });
 
@@ -117,7 +120,10 @@ describe("createReferral", () => {
     ).rejects.toBeInstanceOf(Errors.ValidationError);
 
     await expect(
-      createReferral({ ...payload, referrerShareBpsOfFee: faker.datatype.float() })
+      createReferral({
+        ...payload,
+        referrerShareBpsOfFee: faker.datatype.float(),
+      })
     ).rejects.toBeInstanceOf(Errors.ValidationError);
   });
 
@@ -135,7 +141,10 @@ describe("createReferral", () => {
     ).rejects.toBeInstanceOf(Errors.ValidationError);
 
     await expect(
-      createReferral({ ...payload, referrerShareBpsOfFee: 10000 + faker.datatype.number() })
+      createReferral({
+        ...payload,
+        referrerShareBpsOfFee: 10000 + faker.datatype.number(),
+      })
     ).rejects.toBeInstanceOf(Errors.ValidationError);
 
     await expect(

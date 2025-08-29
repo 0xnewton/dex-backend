@@ -2,11 +2,11 @@ import {
   createReferral,
   CreateReferralServiceRequest,
 } from "../../src/services/referrals/create-referral";
-import { AlreadyExistsError } from "../../src/lib/errors";
+import { AlreadyExistsError } from "../../src/lib/backend-framework";
 import {
   DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
   DEFAULT_TOTAL_FEE_BPS,
-} from "../../src/lib/constants";
+} from "../../src/lib/config/constants";
 import type { UserDB } from "../../src/lib/db/users/types";
 import type { ReferralDB } from "../../src/lib/db/referrals/types";
 
@@ -76,7 +76,9 @@ describe("createReferral service", () => {
     });
     expect(result.isActive).toBe(referral.isActive);
     expect(result.feeBps).toBe(referral.feeBps);
-    expect(result.referrerShareBpsOfFee).toEqual(referral.referrerShareBpsOfFee);
+    expect(result.referrerShareBpsOfFee).toEqual(
+      referral.referrerShareBpsOfFee
+    );
   });
 
   it("throws AlreadyExistsError when slug already exists", async () => {

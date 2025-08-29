@@ -1,5 +1,5 @@
 import { buildAtomicSwapTxWithFeeSplit } from "../../src/lib/jup";
-import { DEFAULT_TOTAL_FEE_BPS } from "../../src/lib/constants";
+import { DEFAULT_TOTAL_FEE_BPS } from "../../src/lib/config/constants";
 import { makeJupQuote } from "../factories/quotes";
 import { faker } from "@faker-js/faker";
 import BN from "bn.js";
@@ -271,8 +271,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: new Uint8Array(64),
         referrer: {
-            owner: REF_OWNER,
-            shareBpsOfFee: 5000,
+          owner: REF_OWNER,
+          shareBpsOfFee: 5000,
         },
         coldTreasuryOwner: COLD_OWNER,
         platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -297,8 +297,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: new Uint8Array(64),
         referrer: {
-            owner: REF_OWNER,
-            shareBpsOfFee: 5000,
+          owner: REF_OWNER,
+          shareBpsOfFee: 5000,
         },
         coldTreasuryOwner: COLD_OWNER,
         platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -319,8 +319,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: new Uint8Array(64),
         referrer: {
-            owner: REF_OWNER,
-            shareBpsOfFee: 5000,
+          owner: REF_OWNER,
+          shareBpsOfFee: 5000,
         },
         coldTreasuryOwner: COLD_OWNER,
         platformFeeBps:
@@ -343,12 +343,11 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: new Uint8Array(64),
         referrer: {
-            owner: REF_OWNER,
-            shareBpsOfFee: -1 * faker.datatype.number({ min: 1, max: 10000 }),
+          owner: REF_OWNER,
+          shareBpsOfFee: -1 * faker.datatype.number({ min: 1, max: 10000 }),
         },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS
-          
+        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
       })
     ).rejects.toThrow("Referrer fee must be between 0 and 10,000");
   });
@@ -366,11 +365,11 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: new Uint8Array(64),
         referrer: {
-            owner: REF_OWNER,
-            shareBpsOfFee: 10000 + faker.datatype.number({ min: 1, max: 10000 }),
+          owner: REF_OWNER,
+          shareBpsOfFee: 10000 + faker.datatype.number({ min: 1, max: 10000 }),
         },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS  
+        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
       })
     ).rejects.toThrow("Referrer fee must be between 0 and 10,000");
   });
@@ -392,8 +391,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: new Uint8Array(64),
         referrer: {
-            owner: REF_OWNER,
-            shareBpsOfFee: 5000,
+          owner: REF_OWNER,
+          shareBpsOfFee: 5000,
         },
         coldTreasuryOwner: COLD_OWNER,
         platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -416,8 +415,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: new Uint8Array(64),
         referrer: {
-            owner: REF_OWNER,
-            shareBpsOfFee: 5000,
+          owner: REF_OWNER,
+          shareBpsOfFee: 5000,
         },
         coldTreasuryOwner: COLD_OWNER,
         platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -444,8 +443,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: secret,
         referrer: {
-            owner: REF_OWNER,
-            shareBpsOfFee: refShareBpsOfFee,
+          owner: REF_OWNER,
+          shareBpsOfFee: refShareBpsOfFee,
         },
         coldTreasuryOwner: COLD_OWNER,
         platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -515,8 +514,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: new Uint8Array(64),
       referrer: {
-          owner: REF_OWNER,
-          shareBpsOfFee: 0,
+        owner: REF_OWNER,
+        shareBpsOfFee: 0,
       },
       coldTreasuryOwner: COLD_OWNER,
       platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -550,8 +549,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: new Uint8Array(64),
       referrer: {
-          owner: REF_OWNER,
-          shareBpsOfFee: 10_000,
+        owner: REF_OWNER,
+        shareBpsOfFee: 10_000,
       },
       coldTreasuryOwner: COLD_OWNER,
       platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -592,8 +591,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: new Uint8Array(64),
       referrer: {
-          owner: REF_OWNER,
-          shareBpsOfFee: 0,
+        owner: REF_OWNER,
+        shareBpsOfFee: 0,
       },
       coldTreasuryOwner: COLD_OWNER,
       platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -629,8 +628,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: new Uint8Array(64),
       referrer: {
-          owner: REF_OWNER,
-          shareBpsOfFee: 5000,
+        owner: REF_OWNER,
+        shareBpsOfFee: 5000,
       },
       coldTreasuryOwner: COLD_OWNER,
       platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -663,8 +662,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: new Uint8Array(64),
       referrer: {
-          owner: REF_OWNER,
-          shareBpsOfFee: 5000,
+        owner: REF_OWNER,
+        shareBpsOfFee: 5000,
       },
       coldTreasuryOwner: COLD_OWNER,
       platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -687,8 +686,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: new Uint8Array(64),
       referrer: {
-          owner: REF_OWNER,
-          shareBpsOfFee: 1234,
+        owner: REF_OWNER,
+        shareBpsOfFee: 1234,
       },
       coldTreasuryOwner: COLD_OWNER,
       platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -717,8 +716,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: new Uint8Array(64),
       referrer: {
-          owner: REF_OWNER,
-          shareBpsOfFee: tinyShare,
+        owner: REF_OWNER,
+        shareBpsOfFee: tinyShare,
       },
       coldTreasuryOwner: COLD_OWNER,
       platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
@@ -772,8 +771,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: new Uint8Array(64),
         referrer: {
-            owner: REF_OWNER,
-            shareBpsOfFee: refShare,
+          owner: REF_OWNER,
+          shareBpsOfFee: refShare,
         },
         coldTreasuryOwner: COLD_OWNER,
         platformFeeBps: DEFAULT_TOTAL_FEE_BPS,

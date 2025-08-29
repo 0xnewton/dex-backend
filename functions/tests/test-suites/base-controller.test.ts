@@ -1,8 +1,11 @@
 import express from "express";
 import request from "supertest";
 import { ZodError } from "zod";
-import { BaseController, IRouteMeta } from "../../src/lib/backend-framework";
-import { BaseApiError } from "../../src/lib/errors";
+import {
+  BaseController,
+  IRouteMeta,
+  BaseApiError,
+} from "../../src/lib/backend-framework";
 import { makeController, TestControllerBase } from "../factories/controller";
 import { makeRandomRoute, RandomRoute } from "../factories/route";
 import { faker } from "@faker-js/faker";
@@ -81,7 +84,7 @@ describe("BaseController.register()", () => {
 
     await hit().expect(200, { hi: true });
     const agent = request(app);
-    await agent[method]("/"+faker.lorem.word()).expect(404);
+    await agent[method]("/" + faker.lorem.word()).expect(404);
   });
 
   it("extracts Bearer token (case-insensitive, trims space)", async () => {
@@ -158,19 +161,19 @@ describe("BaseController.register()", () => {
     await request(app).get(`${controller.basePath}/anything`).expect(404);
   });
 
-//   it("hang prevention: a middleware that doesn't next() will not return", async () => {
-//     const bad = (_req: any, _res: any, _next: any) => {
-//       /* no next, no send */
-//     };
-//     controller.routes[0].middleware = [bad];
-//     controller.routes[0].callback = async (ctx: any) =>
-//       ctx.response.status(200).send({ ok: true });
+  //   it("hang prevention: a middleware that doesn't next() will not return", async () => {
+  //     const bad = (_req: any, _res: any, _next: any) => {
+  //       /* no next, no send */
+  //     };
+  //     controller.routes[0].middleware = [bad];
+  //     controller.routes[0].callback = async (ctx: any) =>
+  //       ctx.response.status(200).send({ ok: true });
 
-//     app = express();
-//     app.use(express.json());
-//     app.use(controller.basePath, controller.register());
+  //     app = express();
+  //     app.use(express.json());
+  //     app.use(controller.basePath, controller.register());
 
-//     // This will time out if not handled; instead, assert 500 via a global error guard (optional),
-//     // or just document the behavior. I'd keep this commented to avoid slowing the suite.
-//   });
+  //     // This will time out if not handled; instead, assert 500 via a global error guard (optional),
+  //     // or just document the behavior. I'd keep this commented to avoid slowing the suite.
+  //   });
 });

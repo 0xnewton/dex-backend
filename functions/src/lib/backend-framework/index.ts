@@ -3,3 +3,4 @@ export * from "./decorators";
 export * from "./http";
 export * from "./rest-api-context";
 export * from "./route-definition";
+export * from "./errors";

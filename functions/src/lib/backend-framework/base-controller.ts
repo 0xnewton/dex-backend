@@ -7,7 +7,7 @@ import {
   ExpressResponse,
   ExpressRouter,
 } from "./types";
-import { BaseApiError } from "../errors";
+import { BaseApiError } from "./errors";
 import { RestApiContext } from "./rest-api-context";
 import { getHeader, HttpMethod } from "./http";
 import { ZodError } from "zod";
@@ -119,7 +119,7 @@ export const requestCallbackErrorHandlerWrapper = (
         body: context.request.body,
         queryParams: context.request.query,
       });
-      
+
       const authHeader = getHeader(context.request, "authorization");
       const matchedToken = authHeader.match(/^\s*bearer\s+(.+?)\s*$/i);
       if (matchedToken) {

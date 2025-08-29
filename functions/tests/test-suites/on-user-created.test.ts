@@ -18,7 +18,7 @@ jest.mock("firebase-functions", () => ({
   },
 }));
 
-jest.mock("../../src/lib/secretManager", () => ({
+jest.mock("../../src/lib/secret-manager", () => ({
   createSecret: jest.fn(),
   deleteSecret: jest.fn(),
 }));
@@ -34,7 +34,7 @@ jest.mock("../../src/lib/slugs", () => ({
 import { createUser } from "../../src/lib/db/users";
 import { createSolanaWallet } from "../../src/lib/crypto";
 import { logger } from "firebase-functions";
-import { createSecret, deleteSecret } from "../../src/lib/secretManager";
+import { createSecret, deleteSecret } from "../../src/lib/secret-manager";
 import { v4 as uuidv4 } from "uuid";
 import { makeSlug } from "../../src/lib/slugs";
 import { faker } from "@faker-js/faker";
@@ -43,7 +43,7 @@ import { makeWallet } from "../factories/wallet";
 import { makeUser } from "../factories/users";
 
 describe("onUserCreated", () => {
-  let wallet: WalletKeyPair
+  let wallet: WalletKeyPair;
   let secretId: string;
   let secretPath: string;
   let user: UserRecord;
@@ -58,19 +58,19 @@ describe("onUserCreated", () => {
     (createSecret as jest.Mock).mockResolvedValue(secretPath);
     let displayName = faker.internet.userName();
     const userDB = makeUser({
-        displayName
+      displayName,
     });
     // Make it an auth user record
     user = {
       uid: userDB.id,
       displayName: displayName,
       photoURL: userDB.avatarUrl ?? undefined,
-      emailVerified: false, 
+      emailVerified: false,
       disabled: faker.datatype.boolean(),
       metadata: {
         creationTime: Date.now().toLocaleString(),
         lastSignInTime: Date.now().toLocaleString(),
-        toJSON: jest.fn()
+        toJSON: jest.fn(),
       },
       providerData: [],
       toJSON: jest.fn(),
@@ -113,9 +113,9 @@ describe("onUserCreated", () => {
     expect(createUser).toHaveBeenCalledWith(
       expect.objectContaining({
         userID: user.uid,
-        slug: user.uid,               // fallback slug
-        displayName: "",              // empty when no displayName
-        avatarUrl: "",                // empty when no photoURL
+        slug: user.uid, // fallback slug
+        displayName: "", // empty when no displayName
+        avatarUrl: "", // empty when no photoURL
         walletAddress: wallet.publicKey,
         privateKeyPath: secretPath,
       })

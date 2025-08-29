@@ -2,7 +2,7 @@ import { UserRecord } from "firebase-admin/auth";
 import { createUser } from "../../lib/db/users";
 import { createSolanaWallet } from "../../lib/crypto";
 import { logger } from "firebase-functions";
-import { createSecret, deleteSecret } from "../../lib/secretManager";
+import { createSecret, deleteSecret } from "../../lib/secret-manager";
 import { v4 as uuidv4 } from "uuid";
 import { makeSlug } from "../../lib/slugs";
 

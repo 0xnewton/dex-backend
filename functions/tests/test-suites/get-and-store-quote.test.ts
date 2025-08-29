@@ -1,6 +1,9 @@
-import { DEFAULT_TOTAL_FEE_BPS } from "../../src/lib/constants";
-import { NotFoundError } from "../../src/lib/errors";
-import { getAndStoreQuote, GetAndStoreQuotePayload } from "../../src/services/swap/get-and-store-quote";
+import { DEFAULT_TOTAL_FEE_BPS } from "../../src/lib/config/constants";
+import { NotFoundError } from "../../src/lib/backend-framework";
+import {
+  getAndStoreQuote,
+  GetAndStoreQuotePayload,
+} from "../../src/services/swap/get-and-store-quote";
 
 // --- Mocks ---
 jest.mock("../../src/lib/jup/client", () => ({
@@ -31,12 +34,12 @@ describe("getAndStoreQuote", () => {
     jest.clearAllMocks();
     basePayload = makeGetAndStoreQuotePayload();
     quote = makeQuote({
-        userPublicKey: basePayload.userPublicKey,
-        inputMint: basePayload.inputMint,
-        outputMint: basePayload.outputMint,
-        amount: String(basePayload.amount),
-        slippageBps: basePayload.slippageBps,
-        dynamicSlippage: basePayload.dynamicSlippage,
+      userPublicKey: basePayload.userPublicKey,
+      inputMint: basePayload.inputMint,
+      outputMint: basePayload.outputMint,
+      amount: String(basePayload.amount),
+      slippageBps: basePayload.slippageBps,
+      dynamicSlippage: basePayload.dynamicSlippage,
     });
     referral = makeReferral();
     (getJupiterClient as jest.Mock).mockReturnValue(jupClient);
@@ -83,7 +86,7 @@ describe("getAndStoreQuote", () => {
 
   it("with referral: uses referral.feeBps and passes referral metadata into createQuote", async () => {
     (getReferralBySlug as jest.Mock).mockResolvedValue(referral);
-    
+
     basePayload.referralSlug = referral.slug;
     const res = await getAndStoreQuote(basePayload);
 
@@ -120,9 +123,9 @@ describe("getAndStoreQuote", () => {
     (getReferralBySlug as jest.Mock).mockResolvedValue(null);
     basePayload.referralSlug = "missing-one";
 
-    await expect(
-      getAndStoreQuote(basePayload)
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getAndStoreQuote(basePayload)).rejects.toBeInstanceOf(
+      NotFoundError
+    );
 
     expect(quoteGetMock).not.toHaveBeenCalled();
     expect(createQuote).not.toHaveBeenCalled();
@@ -162,7 +165,9 @@ describe("getAndStoreQuote", () => {
     (createQuote as jest.Mock).mockClear();
     (createQuote as jest.Mock).mockRejectedValue(new Error("DB_FAIL"));
 
-    await expect(getAndStoreQuote({ ...basePayload })).rejects.toThrow("DB_FAIL");
+    await expect(getAndStoreQuote({ ...basePayload })).rejects.toThrow(
+      "DB_FAIL"
+    );
   });
 
   it("coerces amount to string when storing", async () => {

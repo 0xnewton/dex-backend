@@ -1,6 +1,6 @@
 import { logger } from "firebase-functions";
 import { ZodError } from "zod";
-import { BaseApiError } from "../../src/lib/errors";
+import { BaseApiError } from "../../src/lib/backend-framework";
 import {
   requestCallbackErrorHandlerWrapper,
   RestApiContext,

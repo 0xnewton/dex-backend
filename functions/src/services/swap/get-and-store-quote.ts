@@ -2,8 +2,8 @@ import { SolanaWalletAddress } from "../../lib/db/generic/types";
 import { getReferralBySlug, ReferralDB } from "../../lib/db/referrals";
 import { getJupiterClient } from "../../lib/jup/client";
 import { createQuote, QuoteDB } from "../../lib/db/quotes";
-import { NotFoundError } from "../../lib/errors";
-import { DEFAULT_TOTAL_FEE_BPS } from "../../lib/constants";
+import { NotFoundError } from "../../lib/backend-framework/errors";
+import { DEFAULT_TOTAL_FEE_BPS } from "../../lib/config/constants";
 import { logger } from "firebase-functions";
 import { QuoteGetRequest } from "@jup-ag/api";
 
@@ -54,7 +54,7 @@ export const getAndStoreQuote: GetAndStoreQuoteFunction = async (
     platformFeeBps,
     swapMode: DEFAULT_SWAP_MODE,
     dynamicSlippage: payload.dynamicSlippage,
-  }
+  };
   logger.info("Fetching quote from Jupiter with params:", quoteBody);
   const quote = await client.quoteGet(quoteBody);
 
