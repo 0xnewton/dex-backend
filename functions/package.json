@@ -21,6 +21,7 @@
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.4",
     "bn.js": "^5.2.2",
+    "bs58": "^6.0.0",
     "firebase-admin": "^12.6.0",
     "firebase-functions": "^6.0.1",
     "zod": "^4.1.3"
