@@ -11,7 +11,7 @@ const DEFAULT_SWAP_MODE = "ExactIn"; // Only ExactIn supported for now due to fe
 
 export interface GetAndStoreQuotePayload {
   referralSlug?: string;
-  userPublicKey: SolanaWalletAddress;
+  userPublicKey?: SolanaWalletAddress;
   inputMint: string;
   outputMint: string;
   amount: number;

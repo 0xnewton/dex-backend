@@ -9,7 +9,7 @@ export interface QuoteWithoutReferralDB {
   id: QuoteID;
   timestamp: Timestamp; // issuedAt
   expiresAt: Timestamp; // TTL
-  userPublicKey: string;
+  userPublicKey: string | null;
   platformFeeBps: number;
   referralId: string | null;
   referralSlug: string | null;

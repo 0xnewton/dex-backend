@@ -2,6 +2,7 @@ import { faker } from "@faker-js/faker";
 import { QuoteResponse } from "@jup-ag/api";
 import { GetAndStoreQuotePayload } from "../../src/services/swap/get-and-store-quote";
 import { QuoteDB } from "../../src/lib/db/quotes";
+import { Timestamp } from "firebase-admin/firestore";
 
 export const makeJupQuote = (
   overrides?: Partial<QuoteResponse>
@@ -74,20 +75,8 @@ export const makeGetAndStoreQuotePayload = (
 export const makeQuote = (overrides?: Partial<QuoteDB>): QuoteDB => {
   const baseQuote: Omit<QuoteDB, "quote"> = {
     id: faker.datatype.uuid(),
-    timestamp: {
-      seconds: faker.datatype.number({
-        min: 1_600_000_000,
-        max: 2_000_000_000,
-      }),
-      nanoseconds: 0,
-    } as any,
-    expiresAt: {
-      seconds: faker.datatype.number({
-        min: 2_000_000_001,
-        max: 2_100_000_000,
-      }),
-      nanoseconds: 0,
-    } as any,
+    timestamp: Timestamp.fromDate(faker.date.recent()),
+    expiresAt: Timestamp.fromDate(faker.date.soon(1)),
     userPublicKey: faker.random.alphaNumeric(44),
     platformFeeBps: faker.datatype.number({ min: 1, max: 100 }),
     referralId: faker.datatype.boolean() ? faker.datatype.uuid() : null,

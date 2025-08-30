@@ -6,7 +6,7 @@ import { ReferralID } from "../referrals";
 import { logger } from "firebase-functions";
 
 interface CreateQuotePayload {
-  userPublicKey: string;
+  userPublicKey?: string;
   platformFeeBps: number;
   referralId?: ReferralID;
   referralSlug?: string;
@@ -33,7 +33,7 @@ export const createQuote = async (
     timestamp: now,
     expiresAt: Timestamp.fromMillis(now.toMillis() + 60_000), // Expires in 60 seconds
     quote: payload.quote,
-    userPublicKey: payload.userPublicKey,
+    userPublicKey: payload.userPublicKey ?? null,
     platformFeeBps: payload.platformFeeBps,
     referralId: payload.referralId ?? null,
     referralSlug: payload.referralSlug ?? null,

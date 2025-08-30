@@ -1,6 +1,8 @@
-import { QuoteResponse } from "@jup-ag/api";
+import { QuoteResponse, SwapInstructionsResponse } from "@jup-ag/api";
 import {
   Connection,
+  PublicKey,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { SolanaWalletAddress } from "../db/generic/types";
 
@@ -9,7 +11,7 @@ export interface ReferrerConfig {
   shareBpsOfFee: number;
 }
 
-export interface BuildAtomicArgs {
+export interface BuildSwapInstructionsArgs {
   connection: Connection;
 
   // From your already-validated quote (MUST be ExactIn)
@@ -33,3 +35,14 @@ export interface BuildAtomicArgs {
   // Referrer
   referrer?: ReferrerConfig;
 };
+
+export interface AtaIx {
+  ata: PublicKey;
+  ix: TransactionInstruction | null;
+}
+
+export interface BuildSwapIntstructionsResult {
+  txBase64: string;
+  lastValidBlockHeight: number;
+  swapIns: SwapInstructionsResponse;
+}

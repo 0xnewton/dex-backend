@@ -1,6 +1,5 @@
 import BN from "bn.js";
 import {
-  Connection,
   PublicKey,
   AddressLookupTableAccount,
   TransactionInstruction,
@@ -9,63 +8,14 @@ import {
   Keypair,
 } from "@solana/web3.js";
 import {
-  getAssociatedTokenAddress,
-  createAssociatedTokenAccountInstruction,
   createTransferCheckedInstruction,
   getMint,
 } from "@solana/spl-token";
-import { SwapInstructionsResponse } from "@jup-ag/api";
-import { BuildAtomicArgs } from "./types";
+import { AtaIx, BuildSwapInstructionsArgs, BuildSwapIntstructionsResult } from "./types";
 import { DEFAULT_TOTAL_FEE_BPS } from "../config/constants";
 import { getJupiterClient } from "./client";
 import { BadRequestError, ValidationError } from "../backend-framework/errors";
-
-/** Small helper to decode a Jupiter instruction object into web3 Instruction */
-function toIx(i: {
-  programId: string;
-  accounts: any[];
-  data: string;
-}): TransactionInstruction {
-  return new TransactionInstruction({
-    programId: new PublicKey(i.programId),
-    keys: i.accounts.map((a) => ({
-      pubkey: new PublicKey(a.pubkey),
-      isSigner: a.isSigner,
-      isWritable: a.isWritable,
-    })),
-    data: Buffer.from(i.data, "base64"),
-  });
-}
-
-async function loadALTs(
-  connection: Connection,
-  keys: string[] | undefined
-): Promise<AddressLookupTableAccount[]> {
-  if (!keys?.length) return [];
-  const lookups = await Promise.all(
-    keys.map((k) => connection.getAddressLookupTable(new PublicKey(k)))
-  );
-  return lookups.flatMap((r) => (r.value ? [r.value] : []));
-}
-
-interface AtaIx {
-  ata: PublicKey;
-  ix: TransactionInstruction | null;
-}
-
-async function maybeCreateAtaIx(
-  connection: Connection,
-  payer: PublicKey,
-  owner: PublicKey,
-  mint: PublicKey
-): Promise<AtaIx> {
-  const ata = await getAssociatedTokenAddress(mint, owner, true);
-  const info = await connection.getAccountInfo(ata);
-  const ix = info
-    ? null
-    : createAssociatedTokenAccountInstruction(payer, ata, owner, mint);
-  return { ata, ix };
-}
+import { loadALTs, maybeCreateAtaIx, toIx } from "./utils";
 
 /**
  * Compose a single atomic v0 transaction:
@@ -76,12 +26,8 @@ async function maybeCreateAtaIx(
  * Server partial-signs as the authority for the fee ATA. User signs & sends.
  */
 export async function buildAtomicSwapTxWithFeeSplit(
-  args: BuildAtomicArgs
-): Promise<{
-  txBase64: string;
-  lastValidBlockHeight: number;
-  swapIns: SwapInstructionsResponse;
-}> {
+  args: BuildSwapInstructionsArgs
+): Promise<BuildSwapIntstructionsResult> {
   const {
     connection,
     quoteResponse,

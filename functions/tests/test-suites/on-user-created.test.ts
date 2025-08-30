@@ -10,14 +10,6 @@ jest.mock("../../src/lib/crypto", () => ({
   createSolanaWallet: jest.fn(),
 }));
 
-// Mock firebase-functions logger
-jest.mock("firebase-functions", () => ({
-  logger: {
-    info: jest.fn(),
-    error: jest.fn(),
-  },
-}));
-
 jest.mock("../../src/lib/secret-manager", () => ({
   createSecret: jest.fn(),
   deleteSecret: jest.fn(),

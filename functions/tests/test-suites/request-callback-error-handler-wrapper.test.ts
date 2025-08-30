@@ -8,13 +8,6 @@ import {
 import { makeRestApiContext } from "../factories/http";
 import { faker } from "@faker-js/faker";
 
-jest.mock("firebase-functions", () => ({
-  logger: {
-    info: jest.fn(),
-    error: jest.fn(),
-  },
-}));
-
 describe("requestCallbackErrorHandlerWrapper", () => {
   let controllerName: string;
   let methodName: string;
