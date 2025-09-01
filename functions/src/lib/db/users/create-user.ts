@@ -1,4 +1,4 @@
-import { UserDB } from "./types";
+import { ProviderDetails, UserDB } from "./types";
 import { getUserDoc } from "../generic";
 import { SolanaWalletAddress } from "../generic/types";
 
@@ -9,6 +9,7 @@ interface CreateUserPayload {
   avatarUrl?: string;
   walletAddress: SolanaWalletAddress;
   privateKeyPath: string;
+  providerDetails?: ProviderDetails[];
 }
 
 export const createUser = async (
@@ -26,6 +27,7 @@ export const createUser = async (
     walletAddress: payload.walletAddress,
     privateKeyPath: payload.privateKeyPath,
     deletedAt: null,
+    providerDetails: payload.providerDetails ?? [],
   };
   await userDoc.create(userData);
   return userData;

@@ -28,9 +28,19 @@ export const onUserCreated: OnUserCreatedFunction = async (user) => {
       avatarUrl: user.photoURL || "",
       walletAddress: wallet.publicKey,
       privateKeyPath,
+      providerDetails: user.providerData.map((provider) => ({
+        providerName: provider.providerId,
+        providerUserID: provider.uid,
+        photoURL: provider.photoURL || null,
+        displayName: provider.displayName || null,
+      })),
     });
+    logger.info("Successfully created user in Firestore", { uid: user.uid });
   } catch (error) {
-    logger.error("Error creating user in Firestore", { error, uid: user.uid });
+    logger.error("Error creating user in Firestore", {
+      details: error?.message,
+      uid: user.uid,
+    });
     // Clean up the secret if user creation fails
     await deleteSecret(secretId);
     throw error;
