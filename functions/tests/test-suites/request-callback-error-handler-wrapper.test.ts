@@ -1,5 +1,5 @@
 import { logger } from "firebase-functions";
-import { ZodError } from "zod";
+import { ZodError, z } from "zod";
 import { BaseApiError } from "../../src/lib/backend-framework";
 import {
   requestCallbackErrorHandlerWrapper,
@@ -78,7 +78,7 @@ describe("requestCallbackErrorHandlerWrapper", () => {
     expect(ctx.token).toBeUndefined();
   });
 
-  it("BaseApiError → returns status & message", async () => {
+  it("BaseApiError → throws the error", async () => {
     class NotFoundError extends BaseApiError {
       constructor() {
         super("Not found", 404);
@@ -96,40 +96,32 @@ describe("requestCallbackErrorHandlerWrapper", () => {
       handler
     );
 
-    await wrapped(ctx);
-
-    expect(ctx.response.status).toHaveBeenCalledWith(404);
-    expect(ctx.response.send).toHaveBeenCalledWith({ message: "Not found" });
-    expect(logger.error).toHaveBeenCalled();
+    await expect(wrapped(ctx)).rejects.toThrow(NotFoundError);
+    expect(ctx.response.status).not.toHaveBeenCalled();
+    expect(ctx.response.send).not.toHaveBeenCalled();
   });
 
-  it("ZodError → 400 with issues", async () => {
-    const zErr = new ZodError([
-      { code: "custom", path: ["x"], message: "bad" } as any,
-    ]);
-    const handler = jest.fn(async () => {
-      throw zErr;
-    });
+  it("ZodError → throws the error", async () => {
     const ctx = makeRestApiContext();
     ctx.response.status = statusMock;
     ctx.response.send = sendMock;
+
+    const schema = z.object({ x: z.string() });
+    const handler = jest.fn(async () => {
+      schema.parse({ x: 123 }); // throws ZodError
+    });
     const wrapped = requestCallbackErrorHandlerWrapper(
       controllerName,
       methodName,
       handler
     );
 
-    await wrapped(ctx);
-
-    expect(ctx.response.status).toHaveBeenCalledWith(400);
-    expect(ctx.response.send).toHaveBeenCalledWith({
-      message: "Validation error",
-      issues: zErr.issues,
-    });
-    expect(logger.error).toHaveBeenCalled();
+    await expect(wrapped(ctx)).rejects.toThrow(ZodError);
+    expect(ctx.response.status).not.toHaveBeenCalled();
+    expect(ctx.response.send).not.toHaveBeenCalled();
   });
 
-  it("Unexpected error → 500 generic message", async () => {
+  it("Unexpected error → throws the error", async () => {
     const ctx = makeRestApiContext();
     ctx.response.status = statusMock;
     ctx.response.send = sendMock;
@@ -142,17 +134,8 @@ describe("requestCallbackErrorHandlerWrapper", () => {
       handler
     );
 
-    await wrapped(ctx);
-
-    expect(ctx.response.status).toHaveBeenCalledWith(500);
-    expect(ctx.response.send).toHaveBeenCalledWith({
-      message: "Unexpected error occurred",
-    });
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `${controllerName}.${methodName} unexpected error`
-      ),
-      expect.objectContaining({ message: "kaboom" })
-    );
+    await expect(wrapped(ctx)).rejects.toThrow("kaboom");
+    expect(ctx.response.status).not.toHaveBeenCalled();
+    expect(ctx.response.send).not.toHaveBeenCalled();
   });
 });

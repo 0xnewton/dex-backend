@@ -21,7 +21,7 @@ export interface RequestMiddleware extends ExpressRequestHandler {
 }
 
 export interface RequestHandler {
-  (context: RestApiContext): Promise<ExpressResponse>;
+  (context: RestApiContext): Promise<any>;
 }
 
 export interface IRouteMeta {
@@ -70,6 +70,32 @@ export class BaseController implements IBaseController {
       );
       router[method](path, ...middleware, routeHandler);
     }
+
+    router.use(
+      (
+        err: unknown,
+        req: ExpressRequest,
+        res: ExpressResponse,
+        _next: ExpressNextFunction
+      ) => {
+        logger.error(`${this.controllerName} unexpected error`, {
+          stack: err instanceof Error ? err.stack : undefined,
+          body: req.body,
+          queryParams: req.query,
+          message: err instanceof Error ? err.message : String(err),
+        });
+
+        if (err instanceof BaseApiError) {
+          return res.status(err.status).send({ message: err.message });
+        }
+        if (err instanceof ZodError) {
+          return res
+            .status(400)
+            .send({ message: "Validation error", issues: err.issues });
+        }
+        return res.status(500).send({ message: "Unexpected error occurred" });
+      }
+    );
     return router;
   }
 }
@@ -108,46 +134,39 @@ export const requestCallbackExpressHandler = (
   };
 };
 
+const normalizeAndSend = (
+  ctx: RestApiContext,
+  result: any 
+) => {
+  if (result === undefined) return ctx.response.status(204).send();
+
+  return ctx.response.status(200).send(result);
+}
+
 export const requestCallbackErrorHandlerWrapper = (
   controllerName: string,
   methodName: string,
   callback: RequestHandler
 ): RequestHandler => {
   return async (context: RestApiContext) => {
-    try {
-      logger.info(`${controllerName}.${methodName} request`, {
-        body: context.request.body,
-        queryParams: context.request.query,
-      });
+    logger.info(`${controllerName}.${methodName} request`, {
+      body: context.request.body,
+      queryParams: context.request.query,
+    });
 
-      const authHeader = getHeader(context.request, "authorization");
-      const matchedToken = authHeader.match(/^\s*bearer\s+(.+?)\s*$/i);
-      if (matchedToken) {
-        context.token = matchedToken[1];
-      }
-
-      const result = await callback(context);
-      return result;
-    } catch (err) {
-      logger.error(`${controllerName}.${methodName} unexpected error`, {
-        stack: err instanceof Error ? err.stack : undefined,
-        body: context.request.body,
-        queryParams: context.request.query,
-        message: err instanceof Error ? err.message : undefined,
-      });
-      if (err instanceof BaseApiError) {
-        return context.response
-          .status(err.status)
-          .send({ message: err.message });
-      } else if (err instanceof ZodError) {
-        return context.response
-          .status(400)
-          .send({ message: "Validation error", issues: err.issues });
-      } else {
-        return context.response
-          .status(500)
-          .send({ message: "Unexpected error occurred" });
-      }
+    const authHeader = getHeader(context.request, "authorization");
+    const matchedToken = authHeader.match(/^\s*bearer\s+(.+?)\s*$/i);
+    if (matchedToken) {
+      context.token = matchedToken[1];
     }
+
+    const result = await callback(context);
+
+    // If the handler already sent the response, don’t send again
+    if (context.response.headersSent) {
+      return context.response;
+    }
+
+    return normalizeAndSend(context, result);
   };
 };

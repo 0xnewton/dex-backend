@@ -4,6 +4,6 @@ interface ReferralServiceInterface {
   createReferral: CreateReferralFunction;
 }
 
-export class ReferralService implements ReferralServiceInterface {
+export default class ReferralService implements ReferralServiceInterface {
   createReferral = createReferral;
 }

@@ -176,4 +176,90 @@ describe("BaseController.register()", () => {
   //     // This will time out if not handled; instead, assert 500 via a global error guard (optional),
   //     // or just document the behavior. I'd keep this commented to avoid slowing the suite.
   //   });
+
+  it("returns 204 when handler returns undefined", async () => {
+    controller.routes[0].callback = async (ctx: any) => {
+      // no send; return nothing
+      return undefined;
+    };
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+
+    await hit().expect(204);
+  });
+
+  it("serializes primitive and array results as 200", async () => {
+    controller.routes[0].callback = async () => "ok";
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+    await hit().expect(200, "ok");
+
+    controller.routes[0].callback = async () => [1, 2, 3];
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+    const res = await hit().expect(200);
+    expect(res.body).toEqual([1, 2, 3]);
+  });
+
+  it("does not double-send if handler already responded", async () => {
+    controller.routes[0].callback = async (ctx: any) => {
+      ctx.response.status(202).send({ ok: true });
+      // return anything; wrapper should see headersSent and skip
+      return { status: 999, body: { nope: true } };
+    };
+
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+
+    await hit().expect(202, { ok: true });
+  });
+
+  it("passes through response-like return value", async () => {
+    controller.routes[0].callback = async (ctx: any) => {
+      return ctx.response.status(206).send({ partial: true });
+    };
+
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+
+    await hit().expect(206, { partial: true });
+  });
+
+  it("ignores malformed Authorization header", async () => {
+    let seenToken: string | undefined = "preset";
+    controller.routes[0].callback = async (ctx: any) => {
+      seenToken = ctx.token;
+      return ctx.response.status(200).send({ ok: true });
+    };
+
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+
+    await hit({ Authorization: "Bearer" }).expect(200); // no token
+    expect(seenToken).toBeUndefined();
+
+    await hit({ Authorization: "Token abc" }).expect(200); // different scheme
+    expect(seenToken).toBeUndefined();
+  });
+
+  it("maps errors thrown by middleware", async () => {
+    const m = (_req: any, _res: any, _next: any) => {
+      throw new Error("midfail");
+    };
+    controller.routes[0].middleware = [m];
+    controller.routes[0].callback = async (ctx: any) =>
+      ctx.response.status(200).send({ ok: true });
+
+    app = express();
+    app.use(express.json());
+    app.use(controller.basePath, controller.register());
+
+    await hit().expect(500, { message: "Unexpected error occurred" });
+  });
 });

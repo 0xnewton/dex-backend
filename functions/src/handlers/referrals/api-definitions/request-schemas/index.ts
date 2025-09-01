@@ -1,10 +1,8 @@
 import { z } from "zod";
 
-export const QueryParamsSchema = z.object({
-  limit: z.string().optional(),
-  offset: z.string().optional(),
-});
-
-export const PathParamsSchema = z.object({
-  referralId: z.string().uuid(),
+export const createReferralBodySchema = z.object({
+  slug: z.string().optional(),
+  description: z.string().optional(),
+  isActive: z.boolean().optional(),
+  referrerFeeBps: z.number().optional(),
 });

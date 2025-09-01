@@ -4,20 +4,32 @@ import {
   AuthenticateToken,
   RouteCtx,
   BaseController,
+  UnauthorizedError,
 } from "../../lib/backend-framework";
-import { CreateReferralDef } from "./api-definitions/route-defs";
+import { createReferralDef } from "./api-definitions/route-defs";
+import ReferralService from "../../services/referrals";
 
 @Controller("/referrals")
 class ReferralsController extends BaseController {
+  private referralService: ReferralService = new ReferralService();
+
   @AuthenticateToken()
-  @Route(CreateReferralDef)
+  @Route(createReferralDef)
   public async createReferralControllerMethod(
-    ctx: RouteCtx<typeof CreateReferralDef>
+    ctx: RouteCtx<typeof createReferralDef>
   ) {
-    console.log(ctx.pathParams);
-    console.log(ctx.queryParams);
-    console.log(ctx.claims);
-    return ctx.response.json({});
+    if (!ctx.claims?.user) {
+      throw new UnauthorizedError();
+    }
+
+    const referralCreated = await this.referralService.createReferral({
+      userID: ctx.claims.user.id,
+      slug: ctx.request.body.slug,
+      description: ctx.request.body.description,
+      isActive: ctx.request.body.isActive,
+    });
+
+    return referralCreated;
   }
 }
 

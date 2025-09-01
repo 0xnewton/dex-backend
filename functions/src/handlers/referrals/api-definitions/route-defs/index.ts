@@ -1,9 +1,8 @@
 import { HttpMethod } from "../../../../lib/backend-framework";
-import { PathParamsSchema, QueryParamsSchema } from "../request-schemas";
+import { createReferralBodySchema } from "../request-schemas";
 
-export const CreateReferralDef = {
+export const createReferralDef = {
   path: "",
   method: HttpMethod.POST,
-  pathParamsSchema: PathParamsSchema,
-  queryParamsSchema: QueryParamsSchema,
+  payloadSchema: createReferralBodySchema,
 } as const;
