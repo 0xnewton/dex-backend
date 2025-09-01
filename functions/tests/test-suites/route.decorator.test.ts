@@ -1,3 +1,5 @@
+import express from "express";
+import request from "supertest";
 import { ZodError } from "zod";
 import { type IRouteMeta } from "../../src/lib/backend-framework/base-controller";
 import { makeRandomObject, makeRestApiContext } from "../factories/http";
@@ -9,6 +11,7 @@ import {
 } from "../factories/controller";
 import { faker } from "@faker-js/faker";
 import { fakeFromZod } from "../factories/zod";
+import { BaseApiError } from "../../src/lib/backend-framework";
 
 describe("Route decorator", () => {
   describe("with all combinations of path/payload/query", () => {
@@ -271,6 +274,178 @@ describe("Route decorator", () => {
       expect(r2.path).toBe(randomRoutes[1].def.path);
       expect(r2.methodName).toBe("handler2");
       expect(typeof r2.callback).toBe("function");
+    });
+  });
+
+  describe("with middleware", () => {
+    let mA: jest.Mock;
+    let mB: jest.Mock;
+    let mShortCircuit: jest.Mock;
+    let mBoom: jest.Mock;
+    let mApiError: jest.Mock;
+    let order: string[];
+    let hit: (
+      app: any,
+      basePath,
+      def: RandomRoute<any>,
+      body?: any
+    ) => request.Test;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      order = [];
+      mA = jest.fn((req, res, next) => {
+        order.push("mA");
+        next();
+      });
+      mB = jest.fn((req, res, next) => {
+        order.push("mB");
+        next();
+      });
+      mShortCircuit = jest.fn((req, res, _next) => {
+        res.status(429).json({ error: "rate_limited" });
+      });
+      mBoom = jest.fn(() => {
+        throw new Error("boom");
+      });
+      mApiError = jest.fn((req, res, next) => {
+        throw new BaseApiError("ouch", 418);
+      });
+      hit = (
+        app: express.Express,
+        basePath: string,
+        def: RandomRoute<any>,
+        body?: any
+      ) => {
+        const method = def.def.method.toLowerCase();
+        const url = `${basePath}${def.def.path}`;
+        const agent = request(app);
+        const req = agent[method](url);
+        if (!["get", "head", "delete"].includes(method)) req.send(body ?? {});
+        return req;
+      };
+    });
+
+    it("preserves middleware metadata from the route definition", () => {
+      const def = makeRandomRoute();
+      const routeDef = { ...def.def, middleware: [mA, mB] };
+
+      const controller = makeController(routeDef);
+      const basePath = controller.basePath;
+
+      expect(controller.routes).toHaveLength(1);
+      const r: IRouteMeta = controller.routes[0];
+
+      expect(Array.isArray(r.middleware)).toBe(true);
+      expect(r.middleware?.length).toBe(2);
+      expect(r.middleware![0]).toBe(mA);
+      expect(r.middleware![1]).toBe(mB);
+    });
+
+    it("executes middleware in order before the handler (integration with Express)", async () => {
+      const def = makeRandomRoute({
+        withPathParams: false,
+        withPayload: false,
+        withQuery: false,
+      });
+      const routeDefs = { ...def.def, middleware: [mA, mB] };
+      const controller = makeController(routeDefs);
+
+      // The handler in TestControllerBase typically sets { ok: true } and records "seen".
+      // We'll verify order by reading a value the handler returns OR by side effect.
+      const app = express();
+      app.use(controller.basePath, controller.register());
+      const basePath = controller.basePath;
+
+      const res = await hit(app, basePath, def);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ ok: true });
+
+      // Our middleware pushed into `order` before handler ran
+      expect(order).toEqual(["mA", "mB"]);
+    });
+
+    it("short-circuits when a middleware sends the response", async () => {
+      const def = makeRandomRoute({
+        withPathParams: false,
+        withPayload: false,
+        withQuery: false,
+      });
+      def.def.middleware = [mShortCircuit, mA]
+      const controller = makeController(def.def);
+
+      const app = express();
+      app.use(express.json());
+      app.use(controller.basePath, controller.register());
+
+      const res = await hit(app, controller.basePath, def);
+
+      expect(res.status).toBe(429);
+      expect(res.body).toEqual({ error: "rate_limited" });
+      // Ensure anything after the short-circuit did not run
+      expect(order).toEqual([]);
+      // And the handler wasn't called (no ctx flattening observed)
+      expect(controller.seen).toBeUndefined();
+    });
+
+    it("propagates internal errors from middleware via next(err)", async () => {
+      const def = makeRandomRoute({
+        withPathParams: false,
+        withPayload: false,
+        withQuery: false,
+      });
+      def.def.middleware = [mBoom];
+      const controller = makeController(def.def);
+
+      const app = express();
+      app.use(express.json());
+      app.use(controller.basePath, controller.register());
+
+      const res = await hit(app, controller.basePath, def)
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ message: "Unexpected error occurred" });
+      // No handler run
+      expect(controller.seen).toBeUndefined();
+    });
+
+    it("propagates api errors and maps the status via next(err)", async () => {
+      const def = makeRandomRoute({
+        withPathParams: false,
+        withPayload: false,
+        withQuery: false,
+      });
+      def.def.middleware = [mApiError];
+      const controller = makeController(def.def);
+
+      const app = express();
+      app.use(express.json());
+      app.use(controller.basePath, controller.register());
+
+      const res = await hit(app, controller.basePath, def)
+      expect(res.status).toBe(418);
+      expect(res.body).toEqual({ message: "ouch" });
+      // No handler run
+      expect(controller.seen).toBeUndefined();
+    });
+
+    it("still allows calling the route.callback(ctx) directly (middleware-free path)", async () => {
+      const def = makeRandomRoute({
+        withPathParams: false,
+        withPayload: false,
+        withQuery: false,
+      });
+      const routeDefs = { ...def.def, middleware: [mA] };
+      const controller = makeController(routeDefs);
+
+      const r: IRouteMeta = controller.routes[0];
+      // No schemas on purpose; direct ctx call should succeed and skip middleware
+      const ctx = makeRestApiContext({ body: {} });
+      const res = await r.callback(ctx);
+
+      expect(res._status).toBe(200);
+      expect(res._json).toEqual({ ok: true });
+      // Since we didn't go through Express, middleware didn't run
+      expect(order).toEqual([]);
     });
   });
 });
