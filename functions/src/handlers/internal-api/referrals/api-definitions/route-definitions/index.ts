@@ -1,4 +1,7 @@
-import { HttpMethod, RouteDefinition } from "../../../../../lib/backend-framework";
+import {
+  HttpMethod,
+  RouteDefinition,
+} from "../../../../../lib/backend-framework";
 import { createReferralBodySchema } from "../request-schemas";
 
 export const createReferralDef: RouteDefinition = {
