@@ -1,11 +1,9 @@
-import { getReferralBySlug } from "../../lib/db/referrals";
-import { getReferralCountForUser } from "../../lib/db/referrals";
+import { getReferralBySlug, getReferralCountForUser, createReferral as createReferralInDB } from "../../lib/db/referrals";
 import { ReferralDB } from "../../lib/db/referrals/types";
 import { getUserByID } from "../../lib/db/users";
 import { UserDB, UserID } from "../../lib/db/users/types";
 import { AlreadyExistsError, NotFoundError } from "../../lib/backend-framework/errors";
 import { makeSlug } from "../../lib/slugs";
-import { createReferral as createReferralInDB } from "../../lib/db/referrals";
 import {
   DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
   DEFAULT_TOTAL_FEE_BPS,

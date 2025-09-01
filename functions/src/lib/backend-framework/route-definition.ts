@@ -1,5 +1,5 @@
 import { HttpMethod } from "./http";
-import z, { ZodType } from "zod";
+import { z, ZodType } from "zod";
 import { Claims } from "./rest-api-context";
 
 type ZodTypeAny = ZodType<any, any>;

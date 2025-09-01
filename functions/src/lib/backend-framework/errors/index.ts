@@ -20,13 +20,13 @@ export class AlreadyExistsError extends BaseApiError {
 }
 
 export class UnauthorizedError extends BaseApiError {
-  constructor(message: string = "Unauthorized") {
+  constructor(message = "Unauthorized") {
     super(message, 401);
   }
 }
 
 export class ExpiredTokenError extends BaseApiError {
-  constructor(message: string = "Token has expired") {
+  constructor(message = "Token has expired") {
     super(message, 401);
   }
 }

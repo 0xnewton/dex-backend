@@ -25,8 +25,10 @@ export type RestApiContextWith<T extends RouteDefinition> = Omit<
   RestApiContext,
   "claims" | "payload" | "pathParams" | "queryParams"
 > &
-  (PayloadType<T> extends never ? {} : { payload: PayloadType<T> }) &
-  (PathParamsType<T> extends never ? {} : { pathParams: PathParamsType<T> }) &
+  (PayloadType<T> extends never ? object : { payload: PayloadType<T> }) &
+  (PathParamsType<T> extends never
+    ? object
+    : { pathParams: PathParamsType<T> }) &
   (QueryParamsType<T> extends never
-    ? {}
+    ? object
     : { queryParams: QueryParamsType<T> }) & { claims?: Claims };

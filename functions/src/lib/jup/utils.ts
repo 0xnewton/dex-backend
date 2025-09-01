@@ -25,7 +25,7 @@ export const toIx = (i: {
     })),
     data: Buffer.from(i.data, "base64"),
   });
-}
+};
 
 export const loadALTs = async (
   connection: Connection,
@@ -36,7 +36,7 @@ export const loadALTs = async (
     keys.map((k) => connection.getAddressLookupTable(new PublicKey(k)))
   );
   return lookups.flatMap((r) => (r.value ? [r.value] : []));
-}
+};
 
 export const maybeCreateAtaIx = async (
   connection: Connection,
@@ -50,4 +50,4 @@ export const maybeCreateAtaIx = async (
     ? null
     : createAssociatedTokenAccountInstruction(payer, ata, owner, mint);
   return { ata, ix };
-}
+};

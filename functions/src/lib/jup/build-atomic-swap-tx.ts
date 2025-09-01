@@ -7,11 +7,12 @@ import {
   TransactionMessage,
   Keypair,
 } from "@solana/web3.js";
+import { createTransferCheckedInstruction, getMint } from "@solana/spl-token";
 import {
-  createTransferCheckedInstruction,
-  getMint,
-} from "@solana/spl-token";
-import { AtaIx, BuildSwapInstructionsArgs, BuildSwapIntstructionsResult } from "./types";
+  AtaIx,
+  BuildSwapInstructionsArgs,
+  BuildSwapIntstructionsResult,
+} from "./types";
 import { DEFAULT_TOTAL_FEE_BPS } from "../config/constants";
 import { getJupiterClient } from "./client";
 import { BadRequestError, ValidationError } from "../backend-framework/errors";
@@ -94,13 +95,17 @@ export async function buildAtomicSwapTxWithFeeSplit(
 
   // referrer ATA only if needed
   const refEnabled = refAtomsBN.gt(new BN(0)) && !!referrer;
-  const refPk = refEnabled ? new PublicKey(referrer!.owner) : null;
+  const refPk = refEnabled ? new PublicKey(referrer.owner) : null;
+  if (refEnabled && !refPk) {
+    throw new Error("Referrer enabled but no referrer.owner");
+  }
   const {
     ata: referrerAta,
     ix: createRefATA,
-  }: AtaIx | { ata: null; ix: null } = refEnabled
-    ? await maybeCreateAtaIx(connection, userPk, refPk!, mintPk)
-    : { ata: null, ix: null };
+  }: AtaIx | { ata: null; ix: null } =
+    refEnabled && refPk
+      ? await maybeCreateAtaIx(connection, userPk, refPk, mintPk)
+      : { ata: null, ix: null };
 
   // cold treasury ATA (only if we actually sweep > 0)
   const needCold = sweepAtomsBN.gt(new BN(0));

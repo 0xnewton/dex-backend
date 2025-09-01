@@ -1,13 +1,22 @@
-import { GetAndStoreQuoteFunction, getAndStoreQuote } from "./get-and-store-quote";
+import {
+  GetAndStoreQuoteFunction,
+  getAndStoreQuote,
+} from "./get-and-store-quote";
+import {
+  SwapInstructionsFunction,
+  swapInstructions,
+} from "./swap-instructions";
 
 interface SwapServiceInterface {
   getAndStoreQuote: GetAndStoreQuoteFunction;
-  swapInstructions: unknown;
+  swapInstructions: SwapInstructionsFunction;
   executeSwap: unknown;
 }
 
 export class SwapService implements SwapServiceInterface {
   getAndStoreQuote = getAndStoreQuote;
-  swapInstructions = () => {};
-  executeSwap = () => {};
+  swapInstructions = swapInstructions;
+  executeSwap = () => {
+    console.log("foo bar");
+  };
 }

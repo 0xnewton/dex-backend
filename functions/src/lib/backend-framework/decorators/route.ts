@@ -44,7 +44,9 @@ export const Route =
           ...(queryParams !== undefined ? { queryParams } : {}),
         } as RestApiContextWith<T>;
 
-        const handler = (this as any)[methodName] as (c: RestApiContextWith<T>) => ReturnType<RequestHandler>;
+        const handler = (this as any)[methodName] as (
+          c: RestApiContextWith<T>
+        ) => ReturnType<RequestHandler>;
         return handler.call(this, typedCtx);
       };
 

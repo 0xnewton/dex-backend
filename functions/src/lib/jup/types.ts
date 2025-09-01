@@ -16,17 +16,17 @@ export interface BuildSwapInstructionsArgs {
 
   // From your already-validated quote (MUST be ExactIn)
   quoteResponse: QuoteResponse;
-  inputMint: string;              // base58
+  inputMint: string; // base58
   inputAmountAtoms: string | number; // atoms from quote.inAmount (string ok)
 
   // Wallets
-  userPublicKey: string;          // payer (user), signs client-side
-  intermediateFeeOwner: string;   // your hot wallet (fee ATA authority)
+  userPublicKey: string; // payer (user), signs client-side
+  intermediateFeeOwner: string; // your hot wallet (fee ATA authority)
   intermediateFeeOwnerSecretKey: Uint8Array; // server signer for fee ATA
-  coldTreasuryOwner: SolanaWalletAddress;      // receives remainder
+  coldTreasuryOwner: SolanaWalletAddress; // receives remainder
 
   // Fees
-  platformFeeBps: number;         // e.g. 20 (0.20%)
+  platformFeeBps: number; // e.g. 20 (0.20%)
 
   // Jupiter API
   dynamicSlippage?: boolean;
@@ -34,7 +34,7 @@ export interface BuildSwapInstructionsArgs {
 
   // Referrer
   referrer?: ReferrerConfig;
-};
+}
 
 export interface AtaIx {
   ata: PublicKey;

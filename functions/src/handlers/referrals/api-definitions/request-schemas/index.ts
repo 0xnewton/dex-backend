@@ -1,4 +1,4 @@
-import z from "zod";
+import { z } from "zod";
 
 export const QueryParamsSchema = z.object({
   limit: z.string().optional(),

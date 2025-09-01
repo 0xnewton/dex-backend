@@ -30,7 +30,7 @@ export const getHeader = (req: ExpressRequest, name: string): string => {
     (typeof req.get === "function" ? req.get(name) : undefined);
 
   const headers = req.headers ?? {};
-  const key = Object.keys(headers).find(k => k.toLowerCase() === name.toLowerCase());
+  const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase());
   const fromObj = key ? headers[key] : undefined;
 
   const v = fromFn ?? fromObj ?? "";

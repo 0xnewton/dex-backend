@@ -77,14 +77,14 @@ export const swapInstructions: SwapInstructionsFunction = async (
         quoteId: payload.quoteId,
         referralSlug: quote.referralSlug,
       });
-      throw new NotFoundError(`Referral not found`);
+      throw new NotFoundError("Referral not found");
     }
     if (!referrerUser) {
       logger.error("Referrer user not found for quote with referral", {
         quoteId: payload.quoteId,
         referralSlug: quote.referralSlug,
       });
-      throw new NotFoundError(`Referrer user not found`);
+      throw new NotFoundError("Referrer user not found");
     }
     referralConfig = {
       owner: referrerUser.walletAddress,

@@ -1,42 +1,48 @@
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 
+/**
+ * Loads a Solana Keypair from either:
+ *  - base58-encoded 64-byte secret key string (most wallets)
+ *  - JSON string of a 64-length number[] (solana-keygen file content)
+ *
+ * Rejects anything 32 bytes to avoid seed/half-key ambiguity.
+ */
 export function loadKeypair(secret: string): Keypair {
-  secret = secret.trim();
+  const s = secret.trim();
 
-  // 1) Try solana-keygen JSON array
+  // Try base58 (Phantom/exported “private key” strings)
   try {
-    const arr = JSON.parse(secret);
-    if (Array.isArray(arr) && arr.every((n) => Number.isInteger(n))) {
-      const bytes = Uint8Array.from(arr);
-      if (bytes.length === 64) return Keypair.fromSecretKey(bytes);
-      if (bytes.length === 32) return Keypair.fromSeed(bytes);
+    const bytes = bs58.decode(s);
+    if (bytes.length === 64) {
+      return Keypair.fromSecretKey(bytes);
     }
-  } catch (_) {}
+    if (bytes.length === 32) {
+      throw new Error(
+        "Got 32 bytes (likely a seed or truncated key). Expected a 64-byte secret key."
+      );
+    }
+  } catch {
+    /* not base58, continue */
+  }
 
-  // 2) Try base58
+  // Try solana-keygen JSON array (the file content as a string)
   try {
-    const b58 = bs58.decode(secret);
-    if (b58.length === 64) return Keypair.fromSecretKey(b58);
-    if (b58.length === 32) return Keypair.fromSeed(b58);
-  } catch (_) {}
-
-  // 3) Try base64
-  try {
-    const b64 = Buffer.from(secret, "base64");
-    if (b64.length === 64) return Keypair.fromSecretKey(new Uint8Array(b64));
-    if (b64.length === 32) return Keypair.fromSeed(new Uint8Array(b64));
-  } catch (_) {}
-
-  // 4) Try hex
-  if (/^(0x)?[0-9a-fA-F]+$/.test(secret)) {
-    const hex = secret.startsWith("0x") ? secret.slice(2) : secret;
-    const buf = Buffer.from(hex, "hex");
-    if (buf.length === 64) return Keypair.fromSecretKey(new Uint8Array(buf));
-    if (buf.length === 32) return Keypair.fromSeed(new Uint8Array(buf));
+    const arr = JSON.parse(s);
+    if (
+      Array.isArray(arr) &&
+      arr.length === 64 &&
+      arr.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)
+    ) {
+      const bytes = Uint8Array.from(arr);
+      return Keypair.fromSecretKey(bytes);
+    }
+  } catch {
+    /* not JSON array */
   }
 
   throw new Error(
-    "Unrecognized key format or wrong length. Provide a 64-byte secret (priv+pub) or 32-byte seed in JSON/base58/base64/hex."
+    "Unrecognized key format. Provide a base58-encoded 64-byte secret key (preferred) " +
+      "or a JSON array of 64 numbers from solana-keygen."
   );
 }

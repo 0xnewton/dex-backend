@@ -14,6 +14,4 @@ type FunctionWithoutArgs<T extends RouteDefinition> = () => ResponseType<T>;
 export type ApiHandlerFunction<T extends RouteDefinition> =
   Args<T> extends never ? FunctionWithoutArgs<T> : FunctionWithArgs<T>;
 
-export type ApiHandlerFunctionWithClaims<C extends unknown> = (
-  args: ArgsWithClaims<C>
-) => any;
+export type ApiHandlerFunctionWithClaims<C> = (args: ArgsWithClaims<C>) => any;
