@@ -13,7 +13,7 @@ interface SwapServiceInterface {
   executeSwap: unknown;
 }
 
-export class SwapService implements SwapServiceInterface {
+export default class SwapService implements SwapServiceInterface {
   getAndStoreQuote = getAndStoreQuote;
   swapInstructions = swapInstructions;
   executeSwap = () => {

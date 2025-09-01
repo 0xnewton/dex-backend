@@ -1,5 +1,5 @@
 import { user } from "firebase-functions/v1/auth";
-import { UserService } from "../services/user";
+import { UserService } from "../../services/user";
 import { logger } from "firebase-functions";
 
 export const onUserCreated = user().onCreate(async (user) => {
