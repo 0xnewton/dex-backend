@@ -134,14 +134,11 @@ export const requestCallbackExpressHandler = (
   };
 };
 
-const normalizeAndSend = (
-  ctx: RestApiContext,
-  result: any 
-) => {
+const normalizeAndSend = (ctx: RestApiContext, result: any) => {
   if (result === undefined) return ctx.response.status(204).send();
 
   return ctx.response.status(200).send(result);
-}
+};
 
 export const requestCallbackErrorHandlerWrapper = (
   controllerName: string,

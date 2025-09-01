@@ -54,6 +54,7 @@ export const Route =
         method: def.method,
         path: def.path,
         methodName,
+        middleware: def.middleware,
         callback,
       };
 

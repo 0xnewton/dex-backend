@@ -3,12 +3,12 @@ import {
   Controller,
   RouteCtx,
   BaseController,
-} from "../../lib/backend-framework";
+} from "../../../lib/backend-framework";
 import {
   getQuoteRouteDef,
   swapTransactionsRouteDef,
-} from "./api-definitions/route-defs";
-import SwapService from "../../services/swap";
+} from "./api-definitions/route-definitions";
+import SwapService from "../../../services/swap";
 
 @Controller("/swaps")
 class SwapsController extends BaseController {

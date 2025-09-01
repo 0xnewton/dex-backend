@@ -1,6 +1,7 @@
 import { HttpMethod } from "./http";
 import { z, ZodType } from "zod";
 import { Claims } from "./rest-api-context";
+import { RequestMiddleware } from "./base-controller";
 
 type ZodTypeAny = ZodType<any, any>;
 
@@ -14,6 +15,7 @@ export type RouteDefinition<
   payloadSchema?: PayloadSchema;
   pathParamsSchema?: PathParamsSchema;
   queryParamsSchema?: QueryParamsSchema;
+  middleware?: RequestMiddleware[];
 };
 
 export type PathParamsType<T extends RouteDefinition> =

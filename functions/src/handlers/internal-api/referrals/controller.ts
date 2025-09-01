@@ -5,9 +5,9 @@ import {
   RouteCtx,
   BaseController,
   UnauthorizedError,
-} from "../../lib/backend-framework";
-import { createReferralDef } from "./api-definitions/route-defs";
-import ReferralService from "../../services/referrals";
+} from "../../../lib/backend-framework";
+import { createReferralDef } from "./api-definitions/route-definitions";
+import ReferralService from "../../../services/referrals";
 
 @Controller("/referrals")
 class ReferralsController extends BaseController {

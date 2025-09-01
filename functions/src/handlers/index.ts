@@ -1,3 +1,3 @@
 export * from "./event-triggers";
-export * from "./referrals";
-export * from "./swaps"
+export * from "./internal-api/referrals";
+export * from "./internal-api/swaps";
