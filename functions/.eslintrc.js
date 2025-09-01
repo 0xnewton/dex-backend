@@ -24,6 +24,7 @@ module.exports = {
     "node_modules/**/*", // Ignore node_modules.
     ".eslintrc.js", // Ignore ESLint config file.
     "jest.config.ts", // Ignore Jest config file.
+    "scripts/**/*", // Ignore scripts.
   ],
   plugins: [
     "@typescript-eslint",
