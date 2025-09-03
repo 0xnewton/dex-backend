@@ -25,7 +25,7 @@ interface CreateQuotePayload {
 export const createQuote = async (
   payload: CreateQuotePayload
 ): Promise<QuoteDB> => {
-  logger.info("Creating quote with payload", payload);
+  logger.info("Creating quote in db with payload", payload);
   const doc = getNewQuoteDoc();
   const now = Timestamp.now();
   const data: QuoteDB = {

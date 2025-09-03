@@ -2,11 +2,17 @@ import referralRouter from "./referrals";
 import swapRouter from "./swaps";
 import { onRequest } from "firebase-functions/https";
 import express from "express";
+import cors from "cors";
 
-const api = express();
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-api.use(express.json());
-api.use("/referrals", referralRouter);
-api.use("/swaps", swapRouter);
+const swapApp = express();
+swapApp.set("trust proxy", 1); // Needed for rate limit
+swapApp.use(swapRouter);
 
-export const internalApi = onRequest(api);
+app.use(referralRouter);
+app.use(swapApp);
+
+export const internalApi = onRequest(app);

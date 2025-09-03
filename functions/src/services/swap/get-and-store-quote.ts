@@ -57,6 +57,7 @@ export const getAndStoreQuote: GetAndStoreQuoteFunction = async (
   };
   logger.info("Fetching quote from Jupiter with params:", quoteBody);
   const quote = await client.quoteGet(quoteBody);
+  logger.info("Received quote from Jupiter:", quote);
 
   // Store quote in DB
   const quoteDB = await createQuote({
