@@ -3,24 +3,28 @@ import { onRequest } from "firebase-functions/v2/https";
 import SolanaRpcService from "../../services/solana-rpc";
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeWebReadableStream } from "node:stream/web";
+import { rpcLimiter } from "./rate-limiter";
 
 const app = express();
+app.set("trust proxy", 1);
 
-// middleware: JSON body parser (don’t use for raw body passthrough if you want to stream)
-app.use(express.json({ limit: "512kb" }));
-
-// CORS middleware for all routes
-app.use((req, res, next) => {
+/** CORS for all /rpc routes */
+app.use("/rpc", (req, res, next): void => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   if (req.method === "OPTIONS") {
     res.sendStatus(204);
-  } else {
-    next();
+    return;
   }
+  next();
 });
 
+/** Parse JSON before the limiter so req.body.method is available */
+app.use("/rpc", express.json({ limit: "512kb" }));
+
+/** Rate limit after JSON/CORS */
+app.use("/rpc", rpcLimiter);
 /**
  * Solana RPC proxy
  */

@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 const swapApp = express();
-swapApp.set("trust proxy", 1); // Needed for rate limit
+swapApp.set("trust proxy", true); // Needed for rate limit
 swapApp.use(swapRouter);
 
 app.use(referralRouter);
