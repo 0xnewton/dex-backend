@@ -11,6 +11,11 @@ export const getQuoteBodySchema = z.object({
 });
 
 export const quoteInstructionsBodySchema = z.object({
-  quoteId: z.string(),
   userPublicKey: z.string(),
+  inputMint: z.string(),
+  outputMint: z.string(),
+  amount: z.number(),
+  slippageBps: z.number(),
+  dynamicSlippage: z.boolean(),
+  referralSlug: z.string().optional(),
 });

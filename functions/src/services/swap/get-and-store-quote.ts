@@ -21,15 +21,12 @@ export interface GetAndStoreQuotePayload {
 
 export interface GetAndStoreQuoteResponse {
   quote: QuoteDB;
+  referral: ReferralDB | null;
 }
 
-export type GetAndStoreQuoteFunction = (
+export const getAndStoreQuote = async (
   payload: GetAndStoreQuotePayload
-) => Promise<GetAndStoreQuoteResponse>;
-
-export const getAndStoreQuote: GetAndStoreQuoteFunction = async (
-  payload: GetAndStoreQuotePayload
-) => {
+): Promise<GetAndStoreQuoteResponse> => {
   logger.info("getAndStoreQuote called with payload", payload);
   const client = getJupiterClient();
 
@@ -74,5 +71,5 @@ export const getAndStoreQuote: GetAndStoreQuoteFunction = async (
     slippageBps: payload.slippageBps,
     quote,
   });
-  return { quote: quoteDB };
+  return { quote: quoteDB, referral };
 };

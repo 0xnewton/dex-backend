@@ -89,6 +89,7 @@ describe("onUserCreated", () => {
       avatarUrl: user.photoURL,
       walletAddress: wallet.publicKey,
       privateKeyPath: secretPath,
+      providerDetails: [],
     });
 
     expect(deleteSecret).not.toHaveBeenCalled();
@@ -128,7 +129,7 @@ describe("onUserCreated", () => {
 
     expect(logger.error).toHaveBeenCalledWith(
       "Error creating user in Firestore",
-      expect.objectContaining({ error: err, uid: user.uid })
+      expect.objectContaining({ details: err.message, uid: user.uid })
     );
   });
 
@@ -143,6 +144,35 @@ describe("onUserCreated", () => {
     expect(createUser).toHaveBeenCalledWith(
       expect.objectContaining({
         privateKeyPath: customSecretPath,
+      })
+    );
+  });
+
+  it("passes provider details from auth user to createUser", async () => {
+    const providerData = [
+      {
+        uid: "provider-user-id",
+        displayName: "Provider User",
+        email: "provider@example.com",
+        photoURL: "http://example.com/photo.png",
+        providerId: "google.com",
+        phoneNumber: "+1234567890",
+        toJSON: () => ({}),
+      },
+    ];
+    user = {...user, providerData: providerData, toJSON: jest.fn()}; 
+    (createUser as jest.Mock).mockResolvedValue(undefined);
+
+    await onUserCreated(user);
+
+    expect(createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerDetails: providerData.map((provider) => ({
+          providerName: provider.providerId,
+          providerUserID: provider.uid,
+          photoURL: provider.photoURL,
+          displayName: provider.displayName,
+        })),
       })
     );
   });

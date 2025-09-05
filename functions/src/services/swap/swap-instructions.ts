@@ -1,16 +1,8 @@
 import { logger } from "firebase-functions";
-import {
-  getQuoteById,
-  isQuoteWithReferral,
-  QuoteDB,
-  QuoteID,
-} from "../../lib/db/quotes";
-import {
-  NotFoundError,
-  ResourceExpiredError,
-} from "../../lib/backend-framework";
+import { QuoteDB } from "../../lib/db/quotes";
+import { NotFoundError } from "../../lib/backend-framework";
 import { getUserByID, UserDB } from "../../lib/db/users";
-import { getReferralBySlug, ReferralDB } from "../../lib/db/referrals";
+import { ReferralDB } from "../../lib/db/referrals";
 import {
   BuildSwapInstructionsArgs,
   buildAtomicSwapTxWithFeeSplit,
@@ -28,9 +20,15 @@ import {
 import { loadKeypair } from "../../lib/crypto/load-keypair";
 import { Connection } from "@solana/web3.js";
 import { SolanaWalletAddress } from "../../lib/db/generic";
+import { getAndStoreQuote } from "./get-and-store-quote";
 
 export interface SwapInstructionsPayload {
-  quoteId: QuoteID;
+  referralSlug?: string;
+  inputMint: string;
+  outputMint: string;
+  amount: number;
+  slippageBps: number;
+  dynamicSlippage: boolean;
   userPublicKey: SolanaWalletAddress;
 }
 
@@ -45,52 +43,48 @@ export type SwapInstructionsFunction = (
   payload: SwapInstructionsPayload
 ) => Promise<SwapInstructionsResponse>;
 
-export const swapInstructions: SwapInstructionsFunction = async (
-  payload
+export const swapInstructions = async (
+  payload: SwapInstructionsPayload
 ): Promise<SwapInstructionsResponse> => {
   logger.info("swapInstructions called with payload:", payload);
+  // Recompute the quote for safety
+  const { referral, quote } = await getAndStoreQuote({
+    referralSlug: payload.referralSlug,
+    userPublicKey: payload.userPublicKey,
+    inputMint: payload.inputMint,
+    outputMint: payload.outputMint,
+    amount: payload.amount,
+    slippageBps: payload.slippageBps,
+    dynamicSlippage: payload.dynamicSlippage,
+  });
 
-  const quote = await getQuoteById(payload.quoteId);
-  if (!quote) {
-    throw new NotFoundError("Quote not found");
-  }
-
-  if (quote.expiresAt.toMillis() < Date.now()) {
-    logger.info("Quote has expired", {
-      quoteId: payload.quoteId,
-      expiresAt: quote.expiresAt.toMillis(),
-      currentTime: Date.now(),
+  if (!referral && payload.referralSlug) {
+    logger.error("Referral not found for quote with referral", {
+      quote,
+      referralSlug: payload.referralSlug,
     });
-    throw new ResourceExpiredError("Quote has expired");
+    throw new NotFoundError("Referral not found");
   }
 
   let referrerUser: UserDB | null = null;
-  let referral: ReferralDB | null = null;
-  let referralConfig: ReferrerConfig | undefined = undefined;
-  if (isQuoteWithReferral(quote)) {
-    [referrerUser, referral] = await Promise.all([
-      getUserByID(quote.referralUserId),
-      getReferralBySlug(quote.referralSlug),
-    ]);
-    if (!referral) {
-      logger.error("Referral not found for quote with referral", {
-        quoteId: payload.quoteId,
-        referralSlug: quote.referralSlug,
-      });
-      throw new NotFoundError("Referral not found");
-    }
+  if (referral) {
+    referrerUser = await getUserByID(referral.userID);
     if (!referrerUser) {
       logger.error("Referrer user not found for quote with referral", {
-        quoteId: payload.quoteId,
-        referralSlug: quote.referralSlug,
+        quote,
+        referralSlug: payload.referralSlug,
       });
       throw new NotFoundError("Referrer user not found");
     }
-    referralConfig = {
-      owner: referrerUser.walletAddress,
-      shareBpsOfFee: referral.referrerShareBpsOfFee,
-    };
   }
+
+  const referralConfig: ReferrerConfig | undefined =
+    referral && referrerUser
+      ? {
+          owner: referrerUser.walletAddress,
+          shareBpsOfFee: referral.referrerShareBpsOfFee,
+        }
+      : undefined;
 
   const rpcURL = solanaRpcUrl.value();
   const connection = new Connection(rpcURL);
@@ -100,7 +94,7 @@ export const swapInstructions: SwapInstructionsFunction = async (
 
   const buildAtomicTxArgs: BuildSwapInstructionsArgs = {
     connection,
-    inputAmountAtoms: quote.quote.inAmount,
+    inputAmountAtoms: quote.amount,
     quoteResponse: quote.quote,
     inputMint: quote.inputMint,
     userPublicKey: payload.userPublicKey,

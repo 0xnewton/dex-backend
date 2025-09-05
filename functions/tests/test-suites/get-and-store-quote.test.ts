@@ -81,7 +81,7 @@ describe("getAndStoreQuote", () => {
     });
 
     // returns what createQuote returns
-    expect(res).toEqual({ quote });
+    expect(res).toEqual({ quote, referral: null });
   });
 
   it("with referral: uses referral.feeBps and passes referral metadata into createQuote", async () => {
@@ -116,7 +116,7 @@ describe("getAndStoreQuote", () => {
       quote: quote.quote,
     });
 
-    expect(res).toEqual({ quote });
+    expect(res).toEqual({ quote, referral });
   });
 
   it("throws NotFoundError when referral slug does not exist", async () => {

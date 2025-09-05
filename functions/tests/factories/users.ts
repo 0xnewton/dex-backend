@@ -14,6 +14,7 @@ export const makeUser = (overrides?: Partial<UserDB>): UserDB => {
     walletAddress: faker.finance.ethereumAddress(),
     privateKeyPath: `/keys/${faker.datatype.uuid()}.key`,
     deletedAt: null,
+    providerDetails: []
   };
   return { ...user, ...overrides };
 };

@@ -14,6 +14,7 @@ import SwapService from "../../../services/swap";
 class SwapsController extends BaseController {
   private swapService = new SwapService();
 
+  /** @deprecated - quotes are now generated client side */
   @Route(getQuoteRouteDef)
   public async getQuoteControllerMethod(
     ctx: RouteCtx<typeof getQuoteRouteDef>
@@ -45,11 +46,24 @@ class SwapsController extends BaseController {
   public async swapTransactionsControllerMethod(
     ctx: RouteCtx<typeof swapTransactionsRouteDef>
   ) {
-    const { quoteId, userPublicKey } = ctx.request.body;
+    const {
+      userPublicKey,
+      inputMint,
+      outputMint,
+      amount,
+      slippageBps,
+      dynamicSlippage,
+      referralSlug,
+    } = ctx.request.body;
 
     const result = await this.swapService.swapInstructions({
-      quoteId,
       userPublicKey,
+      inputMint,
+      outputMint,
+      amount,
+      slippageBps,
+      dynamicSlippage,
+      referralSlug,
     });
 
     return result;
