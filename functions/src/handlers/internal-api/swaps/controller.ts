@@ -6,7 +6,7 @@ import {
 } from "../../../lib/backend-framework";
 import {
   getQuoteRouteDef,
-  swapTransactionsRouteDef,
+  swapInstructionsRouteDef,
 } from "./api-definitions/route-definitions";
 import SwapService from "../../../services/swap";
 
@@ -42,9 +42,9 @@ class SwapsController extends BaseController {
     return quote;
   }
 
-  @Route(swapTransactionsRouteDef)
-  public async swapTransactionsControllerMethod(
-    ctx: RouteCtx<typeof swapTransactionsRouteDef>
+  @Route(swapInstructionsRouteDef)
+  public async swapInstructionsControllerMethod(
+    ctx: RouteCtx<typeof swapInstructionsRouteDef>
   ) {
     const {
       userPublicKey,

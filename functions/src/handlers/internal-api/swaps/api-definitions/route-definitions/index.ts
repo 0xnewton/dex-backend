@@ -15,7 +15,7 @@ export const getQuoteRouteDef: RouteDefinition = {
   middleware: [swapRateLimiter],
 };
 
-export const swapTransactionsRouteDef: RouteDefinition = {
+export const swapInstructionsRouteDef: RouteDefinition = {
   path: "/instructions",
   method: HttpMethod.POST,
   payloadSchema: quoteInstructionsBodySchema,
