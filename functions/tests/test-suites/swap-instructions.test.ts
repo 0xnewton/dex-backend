@@ -61,6 +61,12 @@ jest.mock("../../src/services/swap/get-and-store-quote", () => ({
   getAndStoreQuote: (...args: any[]) => getAndStoreQuoteMock(...args),
 }));
 
+const buildUnsignedSwapTxBase64Mock = jest.fn();
+jest.mock("../../src/lib/jup/build-unsigned-swap-tx-b64", () => ({
+  buildUnsignedSwapTxBase64: (...args: any[]) =>
+    buildUnsignedSwapTxBase64Mock(...args),
+}));
+
 // later
 import { Connection } from "@solana/web3.js";
 

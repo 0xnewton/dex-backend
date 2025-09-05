@@ -21,6 +21,7 @@ import { loadKeypair } from "../../lib/crypto/load-keypair";
 import { Connection } from "@solana/web3.js";
 import { SolanaWalletAddress } from "../../lib/db/generic";
 import { getAndStoreQuote } from "./get-and-store-quote";
+import { buildUnsignedSwapTxBase64 } from "../../lib/jup/build-unsigned-swap-tx-b64";
 
 export interface SwapInstructionsPayload {
   referralSlug?: string;
@@ -37,6 +38,7 @@ export interface SwapInstructionsResponse {
   referral: ReferralDB | null;
   referrerUser: UserDB | null;
   quote: QuoteDB;
+  serializedInstructions: string;
 }
 
 export type SwapInstructionsFunction = (
@@ -109,10 +111,17 @@ export const swapInstructions = async (
 
   const instructions = await buildAtomicSwapTxWithFeeSplit(buildAtomicTxArgs);
 
+  const serializedInstructions = await buildUnsignedSwapTxBase64(
+    instructions.swapIns,
+    payload.userPublicKey,
+    connection
+  );
+
   return {
     instructions,
     referral,
     referrerUser,
     quote,
+    serializedInstructions,
   };
 };
