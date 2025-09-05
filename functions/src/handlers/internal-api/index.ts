@@ -3,6 +3,7 @@ import swapRouter from "./swaps";
 import { onRequest } from "firebase-functions/https";
 import express from "express";
 import cors from "cors";
+import { SecretKeys } from "../../lib/config/secrets";
 
 const app = express();
 app.use(cors());
@@ -15,4 +16,6 @@ swapApp.use(swapRouter);
 app.use(referralRouter);
 app.use(swapApp);
 
-export const internalApi = onRequest(app);
+export const internalApi = onRequest({
+    secrets: [SecretKeys.SOLANA_RPC_URL, SecretKeys.JUP_API_KEY, SecretKeys.INTERMEDIATE_FEE_VAULT_PRIVATE_KEY],
+  }, app);

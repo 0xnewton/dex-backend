@@ -4,6 +4,7 @@ import SolanaRpcService from "../../services/solana-rpc";
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeWebReadableStream } from "node:stream/web";
 import { rpcLimiter } from "./rate-limiter";
+import { SecretKeys } from "../../lib/config/secrets";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -73,7 +74,7 @@ export const rpc = onRequest(
     memory: "512MiB",
     cpu: 1,
     cors: false,
-    secrets: ["SOLANA_RPC_URL"],
+    secrets: [SecretKeys.SOLANA_RPC_URL],
   },
   app
 );
