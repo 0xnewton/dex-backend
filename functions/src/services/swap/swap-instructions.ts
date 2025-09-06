@@ -18,10 +18,14 @@ import {
   platformTreasuryPublicKey,
 } from "../../lib/config/variables";
 import { loadKeypair } from "../../lib/crypto/load-keypair";
-import { Connection } from "@solana/web3.js";
+import {
+  Connection,
+  // SimulateTransactionConfig,
+  // Transaction,
+  // VersionedTransaction,
+} from "@solana/web3.js";
 import { SolanaWalletAddress } from "../../lib/db/generic";
 import { getAndStoreQuote } from "./get-and-store-quote";
-import { buildUnsignedSwapTxBase64 } from "../../lib/jup/build-unsigned-swap-tx-b64";
 
 export interface SwapInstructionsPayload {
   referralSlug?: string;
@@ -38,12 +42,30 @@ export interface SwapInstructionsResponse {
   referral: ReferralDB | null;
   referrerUser: UserDB | null;
   quote: QuoteDB;
-  serializedInstructions: string;
 }
 
-export type SwapInstructionsFunction = (
-  payload: SwapInstructionsPayload
-) => Promise<SwapInstructionsResponse>;
+// async function simulateBase64(connection: Connection, txBase64: string) {
+//   const bytes = Buffer.from(txBase64, "base64");
+
+//   // Try v0 first — if it deserializes, it's v0.
+//   try {
+//     const vtx = VersionedTransaction.deserialize(bytes);
+//     const cfg: SimulateTransactionConfig = {
+//       sigVerify: false,
+//       replaceRecentBlockhash: true,
+//     };
+//     return await connection.simulateTransaction(vtx, cfg);
+//   } catch (e) {
+//     // If that failed, treat it as legacy
+//     const ltx = Transaction.from(bytes);
+//     // Legacy overload has no config object. You can pass includeAccounts as 3rd arg if you want.
+//     return await connection.simulateTransaction(
+//       ltx /* signers? */,
+//       undefined /* includeAccounts? */
+//     );
+//     // or: return await connection.simulateTransaction(ltx, undefined, true);
+//   }
+// }
 
 export const swapInstructions = async (
   payload: SwapInstructionsPayload
@@ -94,6 +116,19 @@ export const swapInstructions = async (
     intermediateFeeVaultPrivateKey.value()
   );
 
+  logger.info("Building swap transaction with fee split", {
+    inputAmountAtoms: quote.amount,
+    quoteResponse: quote.quote,
+    inputMint: quote.inputMint,
+    userPublicKey: payload.userPublicKey,
+    platformFeeBps: quote.platformFeeBps,
+    dynamicSlippage: quote.dynamicSlippage,
+    dynamicComputeUnitLimit: true,
+    intermediateFeeOwner: intermediateFeeVaultPublicKey.value(),
+    coldTreasuryOwner: platformTreasuryPublicKey.value(),
+    referrer: referralConfig,
+  });
+
   const buildAtomicTxArgs: BuildSwapInstructionsArgs = {
     connection,
     inputAmountAtoms: quote.amount,
@@ -111,17 +146,32 @@ export const swapInstructions = async (
 
   const instructions = await buildAtomicSwapTxWithFeeSplit(buildAtomicTxArgs);
 
-  const serializedInstructions = await buildUnsignedSwapTxBase64(
-    instructions.swapIns,
-    payload.userPublicKey,
-    connection
-  );
+  // logger.info("Simulating unsigned swap transaction");
+  // try {
+  //   const sim = await simulateBase64(connection, instructions.txBase64);
+  //   logger.info("Simulation result:", sim);
+  //   if (sim.value.err) {
+  //     logger.error("Simulation of unsigned swap transaction failed", {
+  //       error: sim.value.err,
+  //       logs: sim.value.logs,
+  //     });
+  //     throw new Error(
+  //       "Simulation of unsigned swap transaction failed: " +
+  //         JSON.stringify(sim.value.err)
+  //     );
+  //   }
+  //   logger.info("Simulation succeeded", {
+  //     unitsConsumed: sim.value.unitsConsumed,
+  //     logs: sim.value.logs,
+  //   });
+  // } catch (err) {
+  //   logger.error("Error during simulation of unsigned swap transaction", err);
+  // }
 
   return {
     instructions,
     referral,
     referrerUser,
     quote,
-    serializedInstructions,
   };
 };

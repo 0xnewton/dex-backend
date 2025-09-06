@@ -51,8 +51,8 @@ class SwapsController extends BaseController {
       inputMint,
       outputMint,
       amount,
-      slippageBps,
-      dynamicSlippage,
+      // slippageBps,
+      // dynamicSlippage,
       referralSlug,
     } = ctx.request.body;
 
@@ -61,8 +61,8 @@ class SwapsController extends BaseController {
       inputMint,
       outputMint,
       amount,
-      slippageBps,
-      dynamicSlippage,
+      slippageBps: 0,
+      dynamicSlippage: true,
       referralSlug,
     });
 
