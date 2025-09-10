@@ -64,10 +64,24 @@ jest.mock("@solana/web3.js", () => {
     }
   }
 
+  // class VersionedTransaction {
+  //   static __signSpy = jest.fn();
+  //   static __serializeSpy = jest.fn(() => Buffer.from("cafebabe", "utf8"));
+  //   constructor(public msg: any) {}
+  //   sign(signers: any[]) {
+  //     VersionedTransaction.__signSpy(signers);
+  //   }
+  //   serialize() {
+  //     return VersionedTransaction.__serializeSpy();
+  //   }
+  // }
   class VersionedTransaction {
     static __signSpy = jest.fn();
     static __serializeSpy = jest.fn(() => Buffer.from("cafebabe", "utf8"));
-    constructor(public msg: any) {}
+    static __last: any;
+    constructor(public msg: any) {
+      VersionedTransaction.__last = this; // <— remember last instance
+    }
     sign(signers: any[]) {
       VersionedTransaction.__signSpy(signers);
     }
@@ -299,10 +313,13 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inputMint: MINT,
       inAmount,
       platformFee: {
-        amount: new BN(inAmount).mul(new BN(DEFAULT_TOTAL_FEE_BPS)).div(new BN(10_000)).toString(),
-        feeBps: DEFAULT_TOTAL_FEE_BPS
-      }
-    }
+        amount: new BN(inAmount)
+          .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+          .div(new BN(10_000))
+          .toString(),
+        feeBps: DEFAULT_TOTAL_FEE_BPS,
+      },
+    };
   });
 
   it("throws on inputMint mismatch", async () => {
@@ -420,7 +437,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   it("throws if swapMode !== ExactIn", async () => {
     const quote = makeJupQuote({
       swapMode: "ExactOut",
-      ...baseSeedData
+      ...baseSeedData,
     });
 
     await expect(
@@ -454,9 +471,9 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inAmount: tinyAmount,
       platformFee: {
         amount: expectedFee.toString(),
-        feeBps: DEFAULT_TOTAL_FEE_BPS
-      }
-    }
+        feeBps: DEFAULT_TOTAL_FEE_BPS,
+      },
+    };
     const quote = makeJupQuote(payload);
 
     await expect(
@@ -475,7 +492,9 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         coldTreasuryOwner: COLD_OWNER,
         platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
       })
-    ).rejects.toThrow("Computed fee is less than or equal to zero; increase amount or fee bps.");
+    ).rejects.toThrow(
+      "Computed fee is less than or equal to zero; increase amount or fee bps."
+    );
   });
 
   it("happy path: creates missing ATAs, calls Jupiter, splits fee correctly, signs, returns base64", async () => {
@@ -760,9 +779,12 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
     const inAmount = "1000";
     baseSeedData.inAmount = inAmount;
     baseSeedData.platformFee = {
-      amount: new BN(inAmount).mul(new BN(DEFAULT_TOTAL_FEE_BPS)).div(new BN(10_000)).toString(),
-      feeBps: DEFAULT_TOTAL_FEE_BPS
-    }
+      amount: new BN(inAmount)
+        .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+        .div(new BN(10_000))
+        .toString(),
+      feeBps: DEFAULT_TOTAL_FEE_BPS,
+    };
     getMintMock.mockResolvedValueOnce({ decimals: 6 }); // override
     const quote = makeJupQuote(baseSeedData); // fee = floor(1000*BPS/10000)
     // choose BPS so fee small; e.g., DEFAULT_TOTAL_FEE_BPS=20 → fee=2
@@ -826,10 +848,13 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         ...baseSeedData,
         inAmount: amount,
         platformFee: {
-          amount: new BN(amount).mul(new BN(DEFAULT_TOTAL_FEE_BPS)).div(new BN(10_000)).toString(),
-          feeBps: DEFAULT_TOTAL_FEE_BPS
-        }
-      }
+          amount: new BN(amount)
+            .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+            .div(new BN(10_000))
+            .toString(),
+          feeBps: DEFAULT_TOTAL_FEE_BPS,
+        },
+      };
 
       const quote = makeJupQuote(payload);
       await buildAtomicSwapTxWithFeeSplit({
@@ -984,5 +1009,188 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
       })
     ).rejects.toThrow("Expected referrer ATA to be defined");
+  });
+
+  it("no referrer provided → only cold transfer and no ref ATA creation", async () => {
+    const quote = makeJupQuote(baseSeedData);
+
+    await buildAtomicSwapTxWithFeeSplit({
+      connection: connection as any,
+      quoteResponse: quote,
+      inputMint: MINT,
+      inputAmountAtoms: inAmount,
+      userPublicKey: USER,
+      intermediateFeeOwner: FEE_OWNER,
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+      // referrer omitted
+      coldTreasuryOwner: COLD_OWNER,
+      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+    });
+
+    // exactly one transfer (to cold)
+    expect(createTransferCheckedInstructionMock).toHaveBeenCalledTimes(1);
+    const [, , toPk] = createTransferCheckedInstructionMock.mock.calls[0];
+    expect(toPk.toBase58()).toBe(coldATA);
+
+    // no create-ATA for ref
+    const createdATAs =
+      createAssociatedTokenAccountInstructionMock.mock.calls.map((c) =>
+        c[1]?.toBase58?.()
+      );
+    expect(createdATAs).not.toContain(refATA);
+  });
+
+  it("when all ATAs exist → does not create any ATA", async () => {
+    // mark all present
+    connection.setATA(feeATA, true);
+    connection.setATA(refATA, true);
+    connection.setATA(coldATA, true);
+
+    const quote = makeJupQuote(baseSeedData);
+    await buildAtomicSwapTxWithFeeSplit({
+      connection: connection as any,
+      quoteResponse: quote,
+      inputMint: MINT,
+      inputAmountAtoms: inAmount,
+      userPublicKey: USER,
+      intermediateFeeOwner: FEE_OWNER,
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+      referrer: { owner: REF_OWNER, shareBpsOfFee: 1234 },
+      coldTreasuryOwner: COLD_OWNER,
+      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+    });
+
+    expect(createAssociatedTokenAccountInstructionMock).not.toHaveBeenCalled();
+  });
+
+  it("works when quote.platformFee is undefined", async () => {
+    const quote = makeJupQuote({ ...baseSeedData, platformFee: undefined });
+
+    await expect(
+      buildAtomicSwapTxWithFeeSplit({
+        connection: connection as any,
+        quoteResponse: quote,
+        inputMint: MINT,
+        inputAmountAtoms: inAmount,
+        userPublicKey: USER,
+        intermediateFeeOwner: FEE_OWNER,
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+        referrer: { owner: REF_OWNER, shareBpsOfFee: 5000 },
+        coldTreasuryOwner: COLD_OWNER,
+        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      })
+    ).resolves.toBeDefined();
+  });
+
+  it("calls getMint exactly once with the INPUT mint", async () => {
+    const quote = makeJupQuote(baseSeedData);
+    await buildAtomicSwapTxWithFeeSplit({
+      connection: connection as any,
+      quoteResponse: quote,
+      inputMint: MINT,
+      inputAmountAtoms: inAmount,
+      userPublicKey: USER,
+      intermediateFeeOwner: FEE_OWNER,
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+      referrer: { owner: REF_OWNER, shareBpsOfFee: 500 },
+      coldTreasuryOwner: COLD_OWNER,
+      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+    });
+
+    expect(getMintMock).toHaveBeenCalledTimes(1);
+    expect(getMintMock.mock.calls[0][1].toBase58()).toBe(MINT);
+  });
+
+  it("orders instructions: preSwap→swap→postSwap→cleanup (by owner)", async () => {
+    // force creation of all three ATAs so we can see them explicitly
+    connection.setATA(feeATA, false);
+    connection.setATA(refATA, false);
+    connection.setATA(coldATA, false);
+
+    const quote = makeJupQuote(baseSeedData);
+    await buildAtomicSwapTxWithFeeSplit({
+      connection: connection as any,
+      quoteResponse: quote,
+      inputMint: MINT,
+      inputAmountAtoms: inAmount,
+      userPublicKey: USER,
+      intermediateFeeOwner: FEE_OWNER,
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+      referrer: { owner: REF_OWNER, shareBpsOfFee: 1234 },
+      coldTreasuryOwner: COLD_OWNER,
+      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+    });
+
+    const { VersionedTransaction } = require("@solana/web3.js");
+    const instrs: any[] = VersionedTransaction.__last.msg.instructions;
+    const tag = (ix: any) => ix.data.toString();
+
+    const idxSwap = instrs.findIndex((ix) => tag(ix) === "swap");
+    const idxCleanup = instrs.findIndex((ix) => tag(ix) === "cleanup");
+    expect(idxSwap).toBeGreaterThan(-1);
+    expect(idxCleanup).toBeGreaterThan(-1);
+
+    // create-ATA instructions: keys = [payer, ata, owner, mint]
+    const creates = instrs
+      .map((ix, i) => ({ ix, i }))
+      .filter(({ ix }) => tag(ix) === "create-ata")
+      .map(({ ix, i }) => ({ i, owner: ix.keys[2].pubkey.toBase58() }));
+
+    // we expect fee/ref/cold creates to exist
+    const feeCreate = creates.find((c) => c.owner === FEE_OWNER)!;
+    const refCreate = creates.find((c) => c.owner === REF_OWNER)!;
+    const coldCreate = creates.find((c) => c.owner === COLD_OWNER)!;
+
+    // transfers: keys = [from, to, auth, mint]; data is JSON string
+    const transfers = instrs
+      .map((ix, i) => ({ ix, i }))
+      .filter(({ ix }) => tag(ix).startsWith("{"))
+      .map(({ ix, i }) => ({ i, to: ix.keys[1].pubkey.toBase58() }));
+
+    const refXfer = transfers.find((t) => t.to === refATA)!;
+    const coldXfer = transfers.find((t) => t.to === coldATA)!;
+
+    // Fee-vault create happens pre-swap
+    expect(feeCreate.i).toBeLessThan(idxSwap);
+
+    // Ref & cold creates happen post-swap
+    expect(refCreate.i).toBeGreaterThan(idxSwap);
+    expect(coldCreate.i).toBeGreaterThan(idxSwap);
+
+    // Each transfer must happen after its own create (not necessarily after both creates)
+    expect(refXfer.i).toBeGreaterThan(refCreate.i);
+    expect(coldXfer.i).toBeGreaterThan(coldCreate.i);
+
+    // Cleanup is last
+    expect(idxCleanup).toBe(instrs.length - 1);
+  });
+
+  it("throws if fee-vault INPUT ATA cannot be derived", async () => {
+    const quote = makeJupQuote(baseSeedData);
+
+    // First getAssociatedTokenAddress call is for fee vault → return null
+    getAssociatedTokenAddressMock
+      .mockImplementationOnce(() => null as any)
+      .mockImplementation((_mint, owner) => {
+        const ownerPk =
+          typeof owner === "object" ? owner : new PublicKey(owner);
+        const mintPk = typeof _mint === "object" ? _mint : new PublicKey(_mint);
+        return ataFromOwner(ownerPk, mintPk);
+      });
+
+    await expect(
+      buildAtomicSwapTxWithFeeSplit({
+        connection: connection as any,
+        quoteResponse: quote,
+        inputMint: MINT,
+        inputAmountAtoms: inAmount,
+        userPublicKey: USER,
+        intermediateFeeOwner: FEE_OWNER,
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+        referrer: { owner: REF_OWNER, shareBpsOfFee: 5000 },
+        coldTreasuryOwner: COLD_OWNER,
+        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      })
+    ).rejects.toThrow(); // will be a runtime error from using null; acceptable until you add an explicit guard
   });
 });
