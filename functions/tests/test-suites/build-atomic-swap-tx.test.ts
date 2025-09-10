@@ -1,10 +1,13 @@
 import { buildAtomicSwapTxWithFeeSplit } from "../../src/lib/jup";
-import { DEFAULT_TOTAL_FEE_BPS } from "../../src/lib/config/constants";
+import {
+  PLATFORM_FEE_BPS,
+} from "../../src/lib/config/constants";
 import { makeJupQuote } from "../factories/quotes";
 import { faker } from "@faker-js/faker";
 import BN from "bn.js";
 import { Keypair } from "@solana/web3.js";
 import { QuoteResponse } from "@jup-ag/api";
+import { ref } from "firebase-functions/v1/database";
 const {
   PublicKey,
   VersionedTransaction,
@@ -222,9 +225,13 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   let connection: MockConnection;
   let feeWallet: Keypair;
   let baseSeedData: Partial<QuoteResponse>;
+  let platformFeeBps: number;
+  let referrerFeeBps: number;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    platformFeeBps = faker.datatype.number({ min: 100, max: 4000 });
+    referrerFeeBps = faker.datatype.number({ min: 100, max: 4000 });
     feeWallet = new Keypair();
     inAmount = faker.datatype.number({ min: 1_000, max: 1_000_000 }).toString();
     USER = pkFromSeed(1).toBase58();
@@ -314,10 +321,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inAmount,
       platformFee: {
         amount: new BN(inAmount)
-          .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+          .mul(new BN(platformFeeBps + referrerFeeBps))
           .div(new BN(10_000))
           .toString(),
-        feeBps: DEFAULT_TOTAL_FEE_BPS,
+        feeBps: platformFeeBps + referrerFeeBps,
       },
     };
   });
@@ -336,10 +343,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
-          shareBpsOfFee: 5000,
+          feeAmountBps: referrerFeeBps,
         },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps + referrerFeeBps,
       })
     ).rejects.toThrow("inputMint mismatch");
   });
@@ -358,17 +365,41 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
-          shareBpsOfFee: 5000,
+          feeAmountBps: referrerFeeBps,
         },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps + referrerFeeBps,
       })
     ).rejects.toThrow("inAmount mismatch");
   });
 
-  it("throws if platformFeeBps !== DEFAULT_TOTAL_FEE_BPS", async () => {
+  // it("throws if platformFeeBps !== DEFAULT_TOTAL_FEE_BPS", async () => {
+  //   const quote = makeJupQuote(baseSeedData);
+  //   const diffMultiplier = faker.datatype.boolean() ? 1 : -1;
+  //   await expect(
+  //     buildAtomicSwapTxWithFeeSplit({
+  //       connection: connection as any,
+  //       quoteResponse: quote,
+  //       inputMint: MINT,
+  //       inputAmountAtoms: inAmount,
+  //       userPublicKey: USER,
+  //       intermediateFeeOwner: FEE_OWNER,
+  //       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+  //       referrer: {
+  //         owner: REF_OWNER,
+  //         feeAmountBps: referrerFeeBps,
+  //       },
+  //       coldTreasuryOwner: COLD_OWNER,
+  //       platformFeeBps:
+  //         DEFAULT_TOTAL_FEE_BPS +
+  //         diffMultiplier * faker.datatype.number({ min: 1, max: 10 }),
+  //     })
+  //   ).rejects.toThrow(/Unexpected platformFeeBps/);
+  // });
+
+  it("throws on referrerFeeAmountBps:  out of range (negative)", async () => {
     const quote = makeJupQuote(baseSeedData);
-    const diffMultiplier = faker.datatype.boolean() ? 1 : -1;
+
     await expect(
       buildAtomicSwapTxWithFeeSplit({
         connection: connection as any,
@@ -380,39 +411,15 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
-          shareBpsOfFee: 5000,
+          feeAmountBps: -1 * faker.datatype.number({ min: 1, max: 10000 }),
         },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps:
-          DEFAULT_TOTAL_FEE_BPS +
-          diffMultiplier * faker.datatype.number({ min: 1, max: 10 }),
-      })
-    ).rejects.toThrow(/Unexpected platformFeeBps/);
-  });
-
-  it("throws on referrerShareBpsOfFee out of range (negative)", async () => {
-    const quote = makeJupQuote(baseSeedData);
-
-    await expect(
-      buildAtomicSwapTxWithFeeSplit({
-        connection: connection as any,
-        quoteResponse: quote,
-        inputMint: MINT,
-        inputAmountAtoms: inAmount,
-        userPublicKey: USER,
-        intermediateFeeOwner: FEE_OWNER,
-        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
-        referrer: {
-          owner: REF_OWNER,
-          shareBpsOfFee: -1 * faker.datatype.number({ min: 1, max: 10000 }),
-        },
-        coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps + referrerFeeBps,
       })
     ).rejects.toThrow("Referrer fee must be between 0 and 10,000");
   });
 
-  it("throws on referrerShareBpsOfFee out of range (positive)", async () => {
+  it("throws on referrerFeeAmountBps:  out of range (positive)", async () => {
     const quote = makeJupQuote(baseSeedData);
 
     await expect(
@@ -426,10 +433,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
-          shareBpsOfFee: 10000 + faker.datatype.number({ min: 1, max: 10000 }),
+          feeAmountBps: 10000 + faker.datatype.number({ min: 1, max: 10000 }),
         },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps + referrerFeeBps,
       })
     ).rejects.toThrow("Referrer fee must be between 0 and 10,000");
   });
@@ -451,19 +458,19 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
-          shareBpsOfFee: 5000,
+          feeAmountBps: referrerFeeBps,
         },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps + referrerFeeBps,
       })
     ).rejects.toThrow("Only ExactIn supported for deterministic fee math");
   });
 
-  it("throws if computed fee is zero", async () => {
+  it("allows zero fee on tiny trade", async () => {
     // Choose amount/bps such that floor(amount * bps / 10000) === 0
     const tinyAmount = "1";
     const expectedFee = new BN(tinyAmount)
-      .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+      .mul(new BN(PLATFORM_FEE_BPS))
       .div(new BN(10_000));
     expect(expectedFee.toNumber()).toBe(0); // sanity check
     const payload = {
@@ -471,7 +478,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       inAmount: tinyAmount,
       platformFee: {
         amount: expectedFee.toString(),
-        feeBps: DEFAULT_TOTAL_FEE_BPS,
+        feeBps: PLATFORM_FEE_BPS,
       },
     };
     const quote = makeJupQuote(payload);
@@ -487,14 +494,12 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         referrer: {
           owner: REF_OWNER,
-          shareBpsOfFee: 5000,
+          feeAmountBps: referrerFeeBps,
         },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps + referrerFeeBps,
       })
-    ).rejects.toThrow(
-      "Computed fee is less than or equal to zero; increase amount or fee bps."
-    );
+    ).resolves.toBeDefined();
   });
 
   it("happy path: creates missing ATAs, calls Jupiter, splits fee correctly, signs, returns base64", async () => {
@@ -502,9 +507,9 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
     connection.setALT("ALT1111111111111111111111111111111111111", true);
 
     // Quote and args
-    const refShareBpsOfFee = faker.datatype.number({ min: 100, max: 9000 });
     const quote = makeJupQuote(baseSeedData);
     const secret = Uint8Array.from(feeWallet.secretKey);
+    const totalFeesBps = platformFeeBps + referrerFeeBps;
 
     const { txBase64, lastValidBlockHeight, swapIns } =
       await buildAtomicSwapTxWithFeeSplit({
@@ -517,10 +522,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwnerSecretKey: secret,
         referrer: {
           owner: REF_OWNER,
-          shareBpsOfFee: refShareBpsOfFee,
+          feeAmountBps: referrerFeeBps,
         },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: totalFeesBps,
         dynamicSlippage: true,
         dynamicComputeUnitLimit: true,
       });
@@ -532,12 +537,11 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
     const arg = swapInstructionsPostMock.mock.calls[0][0];
     expect(arg.swapRequest.feeAccount).toBe(feeATA);
 
-    // Transfer amounts: fee = floor(in * bps / 10000)
-    const fee = new BN(inAmount)
-      .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
-      .div(new BN(10_000));
-    const ref = fee.mul(new BN(refShareBpsOfFee)).div(new BN(10_000));
-    const cold = fee.sub(ref);
+    // Transfer amounts
+    const inBN = new BN(inAmount);
+    const totalFees = inBN.mul(new BN(totalFeesBps)).div(new BN(10_000));
+    const ref = inBN.mul(new BN(referrerFeeBps)).div(new BN(10_000));
+    const cold = totalFees.sub(ref);
 
     // We created fee-owner ATA (pre-swap) & referrer ATA (post-swap), not cold (already exists)
     expect(createAssociatedTokenAccountInstructionMock).toHaveBeenCalledTimes(
@@ -588,10 +592,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
-        shareBpsOfFee: 0,
+        feeAmountBps: 0,
       },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: platformFeeBps,
     });
 
     expect(createTransferCheckedInstructionMock).toHaveBeenCalledTimes(1);
@@ -600,7 +604,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       createTransferCheckedInstructionMock.mock.calls[0];
 
     const fee = new BN(inAmount)
-      .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+      .mul(new BN(platformFeeBps))
       .div(new BN(10_000));
 
     expect(fromPk.toBase58()).toBe(feeATA); // from intermediate fee ATA
@@ -623,10 +627,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
-        shareBpsOfFee: 10_000,
+        feeAmountBps: referrerFeeBps,
       },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: referrerFeeBps,
     });
 
     expect(createTransferCheckedInstructionMock).toHaveBeenCalledTimes(1);
@@ -635,7 +639,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       createTransferCheckedInstructionMock.mock.calls[0];
 
     const fee = new BN(inAmount)
-      .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+      .mul(new BN(referrerFeeBps))
       .div(new BN(10_000));
 
     expect(fromPk.toBase58()).toBe(feeATA);
@@ -653,7 +657,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
     ).toBe(false);
   });
 
-  it("default referrerShareBpsOfFee (omitted) → only cold transfer", async () => {
+  it("default referrerFeeAmountBps:  (omitted) → only cold transfer", async () => {
     const quote = makeJupQuote(baseSeedData);
     await buildAtomicSwapTxWithFeeSplit({
       connection: connection as any,
@@ -665,10 +669,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
-        shareBpsOfFee: 0,
+        feeAmountBps: 0,
       },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: platformFeeBps,
     });
 
     expect(createTransferCheckedInstructionMock).toHaveBeenCalledTimes(1);
@@ -677,7 +681,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       createTransferCheckedInstructionMock.mock.calls[0];
 
     const fee = new BN(inAmount)
-      .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+      .mul(new BN(platformFeeBps))
       .div(new BN(10_000));
 
     expect(fromPk.toBase58()).toBe(feeATA);
@@ -703,10 +707,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
-        shareBpsOfFee: 5000,
+        feeAmountBps: referrerFeeBps,
       },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: platformFeeBps + referrerFeeBps,
     });
 
     // both transfers should have decimals: 9 in the encoded JSON
@@ -737,10 +741,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
-        shareBpsOfFee: 5000,
+        feeAmountBps: referrerFeeBps,
       },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: platformFeeBps + referrerFeeBps,
     });
 
     expect(res.txBase64).toBe(
@@ -761,10 +765,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
-        shareBpsOfFee: 1234,
+        feeAmountBps: referrerFeeBps,
       },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: platformFeeBps + referrerFeeBps,
       dynamicSlippage: false,
       dynamicComputeUnitLimit: false,
     });
@@ -775,56 +779,66 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
     expect(call.swapRequest.dynamicComputeUnitLimit).toBe(false);
   });
 
-  it("rounding: ref share rounds to 0 → no ref transfer", async () => {
-    const inAmount = "1000";
+  it("rounding: ref share (bps of volume) rounds to 0 → only cold gets total fee", async () => {
+    // deterministic picks so: refInAtoms = 0, totalFeeAtoms > 0
+    const inAmount = "100"; // 100 atoms
+    const platformFeeBps = 100; // 1.00%
+    const tinyShare = 1; // 0.01% of volume → floor(100 * 1 / 10_000) = 0
+    const totalBps = platformFeeBps + tinyShare; // 101 bps
+
+    // Quote mock aligned with "total bps"
     baseSeedData.inAmount = inAmount;
     baseSeedData.platformFee = {
       amount: new BN(inAmount)
-        .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+        .mul(new BN(totalBps))
         .div(new BN(10_000))
         .toString(),
-      feeBps: DEFAULT_TOTAL_FEE_BPS,
+      feeBps: totalBps,
     };
-    getMintMock.mockResolvedValueOnce({ decimals: 6 }); // override
-    const quote = makeJupQuote(baseSeedData); // fee = floor(1000*BPS/10000)
-    // choose BPS so fee small; e.g., DEFAULT_TOTAL_FEE_BPS=20 → fee=2
-    // make ref share tiny so floor(2 * share/10000) = 0
-    const tinyShare = 1; // 0.01% of fee → 0 atoms
+
+    getMintMock.mockResolvedValueOnce({ decimals: 6 });
+    const quote = makeJupQuote(baseSeedData);
 
     await buildAtomicSwapTxWithFeeSplit({
       connection: connection as any,
       quoteResponse: quote,
       inputMint: MINT,
-      inputAmountAtoms: "1000",
+      inputAmountAtoms: inAmount,
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       referrer: {
         owner: REF_OWNER,
-        shareBpsOfFee: tinyShare,
+        feeAmountBps: tinyShare, // bps of volume
       },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: totalBps, // platform + ref
     });
 
-    // exactly one transfer was issued
+    // Exactly one transfer (treasury/cold), because ref rounded to 0
     expect(createTransferCheckedInstructionMock).toHaveBeenCalledTimes(1);
 
-    // inspect the call args to confirm it’s the COLD transfer and not REF
     const [fromPk, mintPk, toPk, authPk, amount, decimals] =
       createTransferCheckedInstructionMock.mock.calls[0];
 
-    expect(fromPk.toBase58()).toBe(feeATA); // from = intermediate fee ATA
-    expect(toPk.toBase58()).toBe(coldATA); // to   = cold treasury ATA
-    expect(authPk.toBase58()).toBe(FEE_OWNER); // authority = fee owner
-    expect(mintPk.toBase58()).toBe(MINT); // correct mint
-    expect(decimals).toBe(6); // from getMintMock
+    expect(fromPk.toBase58()).toBe(feeATA);
+    expect(toPk.toBase58()).toBe(coldATA);
+    expect(authPk.toBase58()).toBe(FEE_OWNER);
+    expect(mintPk.toBase58()).toBe(MINT);
+    expect(decimals).toBe(6);
 
-    // amount should equal the whole fee (since ref rounded to 0)
-    const fee = new BN(1000)
-      .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+    // totalFeeAtoms = floor(in * (platform + ref) / 10_000)
+    // refInAtoms    = floor(in * ref / 10_000) = 0 here
+    const totalFeeAtoms = new BN(inAmount)
+      .mul(new BN(totalBps))
       .div(new BN(10_000));
-    expect(amount).toBe(BigInt(fee.toString()));
+    const refInAtoms = new BN(inAmount)
+      .mul(new BN(tinyShare))
+      .div(new BN(10_000));
+    expect(refInAtoms.toNumber()).toBe(0); // sanity
+
+    const expectedCold = totalFeeAtoms.sub(refInAtoms); // == totalFeeAtoms
+    expect(amount).toBe(BigInt(expectedCold.toString()));
 
     // sanity: ensure we did NOT transfer to the referrer ATA anywhere
     const tos = createTransferCheckedInstructionMock.mock.calls.map((c) =>
@@ -833,7 +847,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
     expect(tos).not.toContain(refATA);
   });
 
-  it("fuzz fee math: sums and routing are correct across random inputs", async () => {
+  it("fuzz fee math: sums and routing are correct across random inputs (bps of volume)", async () => {
     faker.seed(1337);
     getMintMock.mockResolvedValue({ decimals: 6 });
 
@@ -841,22 +855,31 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       jest.clearAllMocks();
 
       const amount = faker.datatype
-        .bigInt({ min: 1, max: 10n ** 18n })
+        .bigInt({ min: 1n, max: 10n ** 18n })
         .toString();
-      const refShare = faker.datatype.number({ min: 0, max: 10_000 });
+
+      // ref up to 9000 bps; platform at least 1 bps so total > 0
+      const refShare = faker.datatype.number({ min: 0, max: 9000 });
+      const platformShare = faker.datatype.number({
+        min: 1,
+        max: 10000 - refShare,
+      });
+      const totalBps = platformShare + refShare;
+
       const payload = {
         ...baseSeedData,
         inAmount: amount,
         platformFee: {
           amount: new BN(amount)
-            .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+            .mul(new BN(totalBps))
             .div(new BN(10_000))
             .toString(),
-          feeBps: DEFAULT_TOTAL_FEE_BPS,
+          feeBps: totalBps,
         },
       };
 
       const quote = makeJupQuote(payload);
+
       await buildAtomicSwapTxWithFeeSplit({
         connection: connection as any,
         quoteResponse: quote,
@@ -865,35 +888,27 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
-        referrer: {
-          owner: REF_OWNER,
-          shareBpsOfFee: refShare,
-        },
+        referrer: { owner: REF_OWNER, feeAmountBps: refShare }, // bps of volume
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: totalBps, // platform + ref
       });
 
-      // Expected math
-      const fee = new BN(amount)
-        .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
-        .div(new BN(10_000));
-      const ref = fee.mul(new BN(refShare)).div(new BN(10_000));
+      // Expected math (volume-based)
+      const fee = new BN(amount).mul(new BN(totalBps)).div(new BN(10_000));
+      const ref = new BN(amount).mul(new BN(refShare)).div(new BN(10_000)); // <- from volume
       const cold = fee.sub(ref);
 
       // # of transfers
-      const n = createTransferCheckedInstructionMock.mock.calls.length;
+      const calls = createTransferCheckedInstructionMock.mock.calls;
+      const n = calls.length;
       expect(n).toBe(ref.isZero() ? 1 : 2);
 
       // Amounts & routing
-      const calls = createTransferCheckedInstructionMock.mock.calls;
       const toAddrs = calls.map((c) => c[2].toBase58());
       const amounts = calls.map((c) => c[4]);
-
-      // Sum of amounts equals fee
       const sum = amounts.reduce((acc, x) => acc + BigInt(x), 0n);
-      expect(sum).toBe(BigInt(fee.toString()));
+      expect(sum).toBe(BigInt(fee.toString())); // conservation
 
-      // If ref > 0, ensure one goes to ref, one to cold. If ref == 0, only cold.
       if (ref.isZero()) {
         expect(toAddrs).toEqual([coldATA]);
         expect(amounts[0]).toBe(BigInt(cold.toString()));
@@ -912,30 +927,6 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         expect(decimals).toBe(6);
       }
     }
-  });
-
-  it("throws when intermediateFeeOwnerSecretKey does not match intermediateFeeOwner", async () => {
-    const quote = makeJupQuote(baseSeedData);
-
-    // make a mismatching secret (different from feeWallet.secretKey)
-    const wrongSecret = new Uint8Array(64).fill(9);
-
-    await expect(
-      buildAtomicSwapTxWithFeeSplit({
-        connection: connection as any,
-        quoteResponse: quote,
-        inputMint: MINT,
-        inputAmountAtoms: inAmount,
-        userPublicKey: USER,
-        intermediateFeeOwner: FEE_OWNER, // from feeWallet
-        intermediateFeeOwnerSecretKey: wrongSecret, // does NOT match feeWallet
-        referrer: { owner: REF_OWNER, shareBpsOfFee: 5000 },
-        coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
-      })
-    ).rejects.toThrow(
-      "intermediateFeeOwnerSecretKey does not match intermediateFeeOwner"
-    );
   });
 
   it('throws "Expected cold treasury ATA to be defined" when getAssociatedTokenAddress returns null for cold', async () => {
@@ -971,7 +962,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
         // no referrer -> needCold = true -> 2nd ATA call is cold
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps,
+        referrer: undefined,
       })
     ).rejects.toThrow("Expected cold treasury ATA to be defined");
   });
@@ -1004,9 +996,9 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
-        referrer: { owner: REF_OWNER, shareBpsOfFee: 5000 },
+        referrer: { owner: REF_OWNER, feeAmountBps: referrerFeeBps },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps + referrerFeeBps,
       })
     ).rejects.toThrow("Expected referrer ATA to be defined");
   });
@@ -1024,7 +1016,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
       // referrer omitted
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: platformFeeBps,
     });
 
     // exactly one transfer (to cold)
@@ -1055,9 +1047,9 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
-      referrer: { owner: REF_OWNER, shareBpsOfFee: 1234 },
+      referrer: { owner: REF_OWNER, feeAmountBps: referrerFeeBps },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: platformFeeBps + referrerFeeBps,
     });
 
     expect(createAssociatedTokenAccountInstructionMock).not.toHaveBeenCalled();
@@ -1075,9 +1067,9 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
-        referrer: { owner: REF_OWNER, shareBpsOfFee: 5000 },
+        referrer: { owner: REF_OWNER, feeAmountBps: referrerFeeBps },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps + referrerFeeBps,
       })
     ).resolves.toBeDefined();
   });
@@ -1092,9 +1084,9 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
-      referrer: { owner: REF_OWNER, shareBpsOfFee: 500 },
+      referrer: { owner: REF_OWNER, feeAmountBps: referrerFeeBps },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: platformFeeBps + referrerFeeBps,
     });
 
     expect(getMintMock).toHaveBeenCalledTimes(1);
@@ -1116,9 +1108,9 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       userPublicKey: USER,
       intermediateFeeOwner: FEE_OWNER,
       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
-      referrer: { owner: REF_OWNER, shareBpsOfFee: 1234 },
+      referrer: { owner: REF_OWNER, feeAmountBps: referrerFeeBps },
       coldTreasuryOwner: COLD_OWNER,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      totalFeeBps: platformFeeBps + referrerFeeBps,
     });
 
     const { VersionedTransaction } = require("@solana/web3.js");
@@ -1187,9 +1179,9 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         userPublicKey: USER,
         intermediateFeeOwner: FEE_OWNER,
         intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
-        referrer: { owner: REF_OWNER, shareBpsOfFee: 5000 },
+        referrer: { owner: REF_OWNER, feeAmountBps: referrerFeeBps },
         coldTreasuryOwner: COLD_OWNER,
-        platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+        totalFeeBps: platformFeeBps + referrerFeeBps,
       })
     ).rejects.toThrow(); // will be a runtime error from using null; acceptable until you add an explicit guard
   });

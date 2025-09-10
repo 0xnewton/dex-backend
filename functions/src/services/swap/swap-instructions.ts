@@ -1,6 +1,6 @@
 import { logger } from "firebase-functions";
 import { QuoteDB } from "../../lib/db/quotes";
-import { NotFoundError } from "../../lib/backend-framework";
+import { BadRequestError, NotFoundError } from "../../lib/backend-framework";
 import { getUserByID, UserDB } from "../../lib/db/users";
 import { ReferralDB } from "../../lib/db/referrals";
 import {
@@ -26,6 +26,7 @@ import {
 } from "@solana/web3.js";
 import { SolanaWalletAddress } from "../../lib/db/generic";
 import { getAndStoreQuote } from "./get-and-store-quote";
+import { MAX_BPS } from "../../lib/config/constants";
 
 export interface SwapInstructionsPayload {
   referralSlug?: string;
@@ -106,7 +107,7 @@ export const swapInstructions = async (
     referral && referrerUser
       ? {
           owner: referrerUser.walletAddress,
-          shareBpsOfFee: referral.referrerShareBpsOfFee,
+          feeAmountBps: referral.referrerFeeBps,
         }
       : undefined;
 
@@ -129,13 +130,24 @@ export const swapInstructions = async (
     referrer: referralConfig,
   });
 
+  const totalFeeAmountBps = quote.platformFeeBps + (referralConfig?.feeAmountBps ?? 0);
+
+  if (totalFeeAmountBps > MAX_BPS) {
+    logger.error("Total fee bps exceeds 10,000", {
+      platformFeeBps: quote.platformFeeBps,
+      referrerFeeBps: referralConfig?.feeAmountBps,
+      totalFeeAmountBps,
+    });
+    throw new BadRequestError("Total fee bps exceeds 10,000");
+  }
+
   const buildAtomicTxArgs: BuildSwapInstructionsArgs = {
     connection,
     inputAmountAtoms: quote.amount,
     quoteResponse: quote.quote,
     inputMint: quote.inputMint,
     userPublicKey: payload.userPublicKey,
-    platformFeeBps: quote.platformFeeBps,
+    totalFeeBps: totalFeeAmountBps,
     dynamicSlippage: quote.dynamicSlippage,
     dynamicComputeUnitLimit: true,
     intermediateFeeOwner: intermediateFeeVaultPublicKey.value(),

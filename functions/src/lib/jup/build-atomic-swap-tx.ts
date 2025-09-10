@@ -13,7 +13,7 @@ import {
   BuildSwapInstructionsArgs,
   BuildSwapIntstructionsResult,
 } from "./types";
-import { DEFAULT_TOTAL_FEE_BPS } from "../config/constants";
+import { MAX_BPS } from "../config/constants";
 import { getJupiterClient } from "./client";
 import { BadRequestError, ValidationError } from "../backend-framework/errors";
 import { loadALTs, maybeCreateAtaIx, toIx } from "./utils";
@@ -40,7 +40,7 @@ export async function buildAtomicSwapTxWithFeeSplit(
     intermediateFeeOwnerSecretKey, // server signer for post-swap transfers
     referrer,
     coldTreasuryOwner,
-    platformFeeBps,
+    totalFeeBps,
     dynamicSlippage = true,
     dynamicComputeUnitLimit = true,
   } = args;
@@ -52,21 +52,22 @@ export async function buildAtomicSwapTxWithFeeSplit(
   if (quoteResponse.inAmount?.toString() !== String(inputAmountAtoms)) {
     throw new ValidationError("inAmount mismatch");
   }
-  if (platformFeeBps !== DEFAULT_TOTAL_FEE_BPS) {
-    throw new BadRequestError(
-      `Unexpected platformFeeBps ${platformFeeBps}, must be ${DEFAULT_TOTAL_FEE_BPS}`
-    );
-  }
   if (quoteResponse.swapMode !== "ExactIn") {
     throw new BadRequestError(
       "Only ExactIn supported for deterministic fee math"
     );
   }
+  if (totalFeeBps < 0 || totalFeeBps > MAX_BPS) {
+    throw new ValidationError("Total fee must be between 0 and 10,000 bps");
+  }
   if (
     referrer &&
-    (referrer.shareBpsOfFee < 0 || referrer.shareBpsOfFee > 10_000)
+    (referrer.feeAmountBps < 0 || referrer.feeAmountBps > MAX_BPS)
   ) {
     throw new ValidationError("Referrer fee must be between 0 and 10,000 bps");
+  }
+  if (referrer && referrer.feeAmountBps > totalFeeBps) {
+    throw new ValidationError("Referrer fee bps cannot exceed total fee bps");
   }
 
   const userPk = new PublicKey(userPublicKey);
@@ -77,16 +78,6 @@ export async function buildAtomicSwapTxWithFeeSplit(
   const inputMintPk = new PublicKey(quoteResponse.inputMint);
 
   // ---------- Compute deterministic INPUT-side fee & splits ----------
-  const inAmountBN = new BN(inputAmountAtoms);
-  const expectedFeeInBN = inAmountBN
-    .mul(new BN(platformFeeBps))
-    .div(new BN(10_000));
-  if (expectedFeeInBN.lte(new BN(0))) {
-    throw new BadRequestError(
-      "Computed fee is less than or equal to zero; increase amount or fee bps."
-    );
-  }
-
   // // If Jupiter provided a platformFee.amount, validate it matches our deterministic math.
   // // (Remove this block if you don't want strict cross-checking.)
   // const quotedFeeStr = quoteResponse.platformFee?.amount ?? null;
@@ -96,15 +87,29 @@ export async function buildAtomicSwapTxWithFeeSplit(
   //   );
   // }
 
-  // Split the INPUT-mint fee for referrer/cold (in INPUT atoms)
-  const refBps = new BN(referrer?.shareBpsOfFee ?? 0);
-  const refInAtoms = expectedFeeInBN.mul(refBps).div(new BN(10_000));
-  const sweepInAtoms = expectedFeeInBN.sub(refInAtoms);
+  const inAmountBN = new BN(inputAmountAtoms);
+  const totalBps = new BN(totalFeeBps);
+  const refBps = new BN(referrer?.feeAmountBps ?? 0);
+
+  // Total fee from volume
+  const totalFeeAtoms = inAmountBN.mul(totalBps).div(new BN(10_000));
+  if (totalFeeAtoms.lt(new BN(0))) {
+    throw new BadRequestError("Computed fee is less than zero");
+  }
+
+  // Referrer gets refBps of volume
+  const refInAtoms = inAmountBN.mul(refBps).div(new BN(10_000));
+  // Treasury gets the remainder of the total fee
+  const platformInAtoms = totalFeeAtoms.sub(refInAtoms);
 
   // ---------- ATAs in INPUT mint (payer = USER) ----------
   // Fee vault ATA (INPUT mint) used by Jupiter during swap to deposit the skimmed fee
   const { ata: feeVaultInputAta, ix: createFeeVaultATA } =
     await maybeCreateAtaIx(connection, userPk, feeOwnerPk, inputMintPk);
+
+  if (!feeVaultInputAta) {
+   throw new Error("Expected fee vault INPUT ATA to be defined");
+  }
 
   // Optional: referrer & cold ATAs (INPUT mint) for post-swap splits
   const refEnabled = refInAtoms.gt(new BN(0)) && !!referrer;
@@ -118,7 +123,7 @@ export async function buildAtomicSwapTxWithFeeSplit(
       ? await maybeCreateAtaIx(connection, userPk, refPk, inputMintPk)
       : { ata: null, ix: null };
 
-  const needCold = sweepInAtoms.gt(new BN(0));
+  const needCold = platformInAtoms.gt(new BN(0));
   const {
     ata: coldInputAta,
     ix: createColdATA,
@@ -180,7 +185,7 @@ export async function buildAtomicSwapTxWithFeeSplit(
         inputMintPk, // mint: INPUT
         coldInputAta, // dest: cold INPUT ATA
         feeOwnerPk, // authority: fee vault owner (server signer)
-        BigInt(sweepInAtoms.toString()),
+        BigInt(platformInAtoms.toString()),
         inDecimals
       )
     );

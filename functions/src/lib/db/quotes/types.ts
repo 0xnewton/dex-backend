@@ -20,6 +20,8 @@ export interface QuoteWithoutReferralDB {
   outputMint: string;
   amount: string;
   slippageBps: number;
+  totalFeeBps: number;
+  referrerFeeBps: number;
 
   quote: QuoteResponse;
 }

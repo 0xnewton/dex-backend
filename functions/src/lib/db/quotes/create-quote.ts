@@ -8,6 +8,8 @@ import { logger } from "firebase-functions";
 interface CreateQuotePayload {
   userPublicKey?: string;
   platformFeeBps: number;
+  referrerFeeBps: number;
+  totalFeeBps: number;
   referralId?: ReferralID;
   referralSlug?: string;
   referralUserId?: string;
@@ -35,6 +37,8 @@ export const createQuote = async (
     quote: payload.quote,
     userPublicKey: payload.userPublicKey ?? null,
     platformFeeBps: payload.platformFeeBps,
+    totalFeeBps: payload.totalFeeBps,
+    referrerFeeBps: payload.referrerFeeBps,
     referralId: payload.referralId ?? null,
     referralSlug: payload.referralSlug ?? null,
     referralUserId: payload.referralUserId ?? null,

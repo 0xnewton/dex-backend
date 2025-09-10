@@ -73,15 +73,21 @@ export const makeGetAndStoreQuotePayload = (
 };
 
 export const makeQuote = (overrides?: Partial<QuoteDB>): QuoteDB => {
+  const hasReferral = faker.datatype.boolean();
+  const platformFeeBps = faker.datatype.number({ min: 1, max: 100 });
+  const referrerFeeBps = hasReferral ? faker.datatype.number({ min: 1, max: 100 }) : 0;
+  const totalFeeBps = platformFeeBps + referrerFeeBps;
   const baseQuote: Omit<QuoteDB, "quote"> = {
     id: faker.datatype.uuid(),
     timestamp: Timestamp.fromDate(faker.date.recent()),
     expiresAt: Timestamp.fromDate(faker.date.soon(1)),
     userPublicKey: faker.random.alphaNumeric(44),
-    platformFeeBps: faker.datatype.number({ min: 1, max: 100 }),
-    referralId: faker.datatype.boolean() ? faker.datatype.uuid() : null,
-    referralSlug: faker.datatype.boolean() ? faker.lorem.word() : null,
-    referralUserId: faker.datatype.boolean() ? faker.datatype.uuid() : null,
+    platformFeeBps,
+    referrerFeeBps,
+    totalFeeBps,
+    referralId: hasReferral ? faker.datatype.uuid() : null,
+    referralSlug: hasReferral ? faker.lorem.word() : null,
+    referralUserId: hasReferral ? faker.datatype.uuid() : null,
     swapMode: "ExactIn",
     dynamicSlippage: faker.datatype.boolean(),
     inputMint: faker.random.alphaNumeric(44),

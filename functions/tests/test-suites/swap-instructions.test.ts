@@ -1,13 +1,13 @@
-import { swapInstructions, SwapInstructionsPayload } from "../../src/services/swap/swap-instructions";
 import {
-  NotFoundError,
-} from "../../src/lib/backend-framework";
+  swapInstructions,
+  SwapInstructionsPayload,
+} from "../../src/services/swap/swap-instructions";
+import { NotFoundError } from "../../src/lib/backend-framework";
 import { QuoteDB } from "../../src/lib/db/quotes";
 import { makeGetAndStoreQuotePayload, makeQuote } from "../factories/quotes";
 import { faker } from "@faker-js/faker";
 import { makeReferral } from "../factories/referrals";
 import { makeUser } from "../factories/users";
-
 
 // Users / Referrals lookups
 const getUserByID = jest.fn();
@@ -71,43 +71,39 @@ import { Connection } from "@solana/web3.js";
 const ts = (ms: number) => ({ toMillis: () => ms }) as any;
 
 describe("swapInstructions", () => {
-  let quote: QuoteDB
-  let args: SwapInstructionsPayload
-  let mockInstructions: any
+  let quote: QuoteDB;
+  let args: SwapInstructionsPayload;
+  let mockInstructions: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    const userPublicKey = faker.finance.ethereumAddress()
-    quote = makeQuote({ userPublicKey })
+    const userPublicKey = faker.finance.ethereumAddress();
+    quote = makeQuote({ userPublicKey });
     const baseSwapAndStorePayload = makeGetAndStoreQuotePayload();
-    args = { userPublicKey, ...baseSwapAndStorePayload }
-    mockInstructions = { txBase64: "FAKE_B64", meta: { ok: true } }
+    args = { userPublicKey, ...baseSwapAndStorePayload };
+    mockInstructions = { txBase64: "FAKE_B64", meta: { ok: true } };
     getAndStoreQuoteMock.mockResolvedValue({ quote, referral: null });
   });
 
   it("errors if payload has referral but the referral doc is missing", async () => {
-    args.referralSlug = faker.helpers.slugify(faker.lorem.word())
+    args.referralSlug = faker.helpers.slugify(faker.lorem.word());
     getAndStoreQuoteMock.mockResolvedValue({ quote, referral: null });
     getUserByID.mockResolvedValue(null);
 
-    await expect(swapInstructions(args)).rejects.toBeInstanceOf(
-      NotFoundError
-    );
+    await expect(swapInstructions(args)).rejects.toBeInstanceOf(NotFoundError);
 
     expect(getUserByID).toHaveBeenCalledTimes(0);
     expect(buildAtomicSwapTxWithFeeSplit).not.toHaveBeenCalled();
   });
 
   it("errors if payload has a referral but the referrer user is missing", async () => {
-    args.referralSlug = faker.helpers.slugify(faker.lorem.word())
-    const referral = makeReferral()
+    args.referralSlug = faker.helpers.slugify(faker.lorem.word());
+    const referral = makeReferral();
 
     getAndStoreQuoteMock.mockResolvedValue({ quote, referral });
     getUserByID.mockResolvedValue(null);
 
-    await expect(swapInstructions(args)).rejects.toBeInstanceOf(
-      NotFoundError
-    );
+    await expect(swapInstructions(args)).rejects.toBeInstanceOf(NotFoundError);
 
     expect(getUserByID).toHaveBeenCalledWith(referral.userID);
     expect(buildAtomicSwapTxWithFeeSplit).not.toHaveBeenCalled();
@@ -123,12 +119,13 @@ describe("swapInstructions", () => {
       instructions: mockInstructions,
       referral: null,
       referrerUser: null,
-      quote
+      quote,
     });
 
     // Connection instantiated with our RPC URL
-    expect((Connection as jest.Mock).mock.calls[0][0]).toBe("https://unit-test.rpc");
-
+    expect((Connection as jest.Mock).mock.calls[0][0]).toBe(
+      "https://unit-test.rpc"
+    );
 
     // Args forwarded correctly
     expect(buildAtomicSwapTxWithFeeSplit).toHaveBeenCalledTimes(1);
@@ -140,7 +137,7 @@ describe("swapInstructions", () => {
         quoteResponse: quote.quote,
         inputMint: quote.inputMint,
         userPublicKey: args.userPublicKey,
-        platformFeeBps: quote.platformFeeBps,
+        totalFeeBps: quote.platformFeeBps,
         dynamicSlippage: quote.dynamicSlippage,
         dynamicComputeUnitLimit: true,
         intermediateFeeOwner: "FAKE_INTERMEDIATE_PUBKEY",
@@ -152,10 +149,10 @@ describe("swapInstructions", () => {
   });
 
   it("builds instructions with referrer when payload has a referral", async () => {
-    args.referralSlug = faker.helpers.slugify(faker.lorem.word())
-    const referral = makeReferral()
+    args.referralSlug = faker.helpers.slugify(faker.lorem.word());
+    const referral = makeReferral();
     getAndStoreQuoteMock.mockResolvedValue({ quote, referral });
-    const user = makeUser()
+    const user = makeUser();
     getUserByID.mockResolvedValue(user);
     buildAtomicSwapTxWithFeeSplit.mockResolvedValue(mockInstructions);
 
@@ -164,7 +161,7 @@ describe("swapInstructions", () => {
       instructions: mockInstructions,
       referral,
       referrerUser: user,
-      quote
+      quote,
     });
 
     expect(buildAtomicSwapTxWithFeeSplit).toHaveBeenCalledTimes(1);
@@ -172,13 +169,13 @@ describe("swapInstructions", () => {
 
     expect(arg.referrer).toEqual({
       owner: user.walletAddress,
-      shareBpsOfFee: referral.referrerShareBpsOfFee,
+      feeAmountBps: referral.referrerFeeBps,
     });
   });
 
   it("it uses the user public key passed in", async () => {
     args.referralSlug = undefined;
-    const user = makeUser()
+    const user = makeUser();
     getUserByID.mockResolvedValue(user);
 
     const cannedResult = { txBase64: "WITH_REF", meta: { ok: true } };
@@ -189,12 +186,39 @@ describe("swapInstructions", () => {
       instructions: cannedResult,
       referral: null,
       referrerUser: null,
-      quote
+      quote,
     });
 
     expect(buildAtomicSwapTxWithFeeSplit).toHaveBeenCalledTimes(1);
     const arg = buildAtomicSwapTxWithFeeSplit.mock.calls[0][0];
 
-    expect(arg.userPublicKey).toBe(args.userPublicKey)
+    expect(arg.userPublicKey).toBe(args.userPublicKey);
+  });
+
+  it("throws error if total fee of referral is > 10,000 bps", async () => {
+    args.referralSlug = faker.helpers.slugify(faker.lorem.word());
+    const platformFeeBps = faker.datatype.number({ min: 5000, max: 10000 });
+    const referral = makeReferral({
+      platformFeeBps,
+      referrerFeeBps: faker.datatype.number({
+        min: 10000 - platformFeeBps + 1,
+        max: 10000 + platformFeeBps + 1,
+      }),
+    });
+    quote.platformFeeBps = platformFeeBps;
+    quote.referrerFeeBps = referral.referrerFeeBps;
+    quote.totalFeeBps = platformFeeBps + referral.referrerFeeBps;
+
+    getAndStoreQuoteMock.mockResolvedValue({ quote, referral });
+
+    const user = makeUser();
+    getUserByID.mockResolvedValue(user);
+
+    await expect(swapInstructions(args)).rejects.toThrow(
+      "Total fee bps exceeds 10,000"
+    );
+    
+    expect(getUserByID).toHaveBeenCalledWith(referral.userID);
+    expect(buildAtomicSwapTxWithFeeSplit).not.toHaveBeenCalled();
   });
 });

@@ -4,8 +4,7 @@ import {
 } from "../../src/services/referrals/create-referral";
 import { AlreadyExistsError, NotFoundError } from "../../src/lib/backend-framework";
 import {
-  DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
-  DEFAULT_TOTAL_FEE_BPS,
+  PLATFORM_FEE_BPS,
 } from "../../src/lib/config/constants";
 import type { UserDB } from "../../src/lib/db/users/types";
 import type { ReferralDB } from "../../src/lib/db/referrals/types";
@@ -54,6 +53,7 @@ describe("createReferral service", () => {
         ? faker.lorem.sentence()
         : undefined,
       isActive: faker.datatype.boolean() ? faker.datatype.boolean() : undefined,
+      feeAmountBps: faker.datatype.number({ min: 0, max: 5000 }),
     };
   });
 
@@ -71,13 +71,13 @@ describe("createReferral service", () => {
       slug: referralPayload.slug,
       description: referralPayload.description,
       isActive: referralPayload.isActive ?? true, // defaults to true
-      feeBps: DEFAULT_TOTAL_FEE_BPS,
-      referrerShareBpsOfFee: DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
+      platformFeeBps: PLATFORM_FEE_BPS,
+      referrerFeeBps: referralPayload.feeAmountBps,
     });
     expect(result.isActive).toBe(referral.isActive);
-    expect(result.feeBps).toBe(referral.feeBps);
-    expect(result.referrerShareBpsOfFee).toEqual(
-      referral.referrerShareBpsOfFee
+    expect(result.platformFeeBps).toBe(referral.platformFeeBps);
+    expect(result.referrerFeeBps).toEqual(
+      referral.referrerFeeBps
     );
   });
 
@@ -179,9 +179,28 @@ describe("createReferral service", () => {
 
     expect(createReferralInDB).toHaveBeenCalledWith(
       expect.objectContaining({
-        feeBps: DEFAULT_TOTAL_FEE_BPS,
-        referrerShareBpsOfFee: DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
+        platformFeeBps: PLATFORM_FEE_BPS,
+        referrerFeeBps: referralPayload.feeAmountBps,
       })
     );
   });
+
+  it("throws error if feeAmountBps is out of range", async () => {
+    const invalidFeeAmounts = [-1, 10001];
+    for (const feeAmount of invalidFeeAmounts) {
+      await expect(
+        createReferral({ ...referralPayload, feeAmountBps: feeAmount })
+      ).rejects.toThrow("feeAmountBps must be between 0 and 10,000");
+    }
+  });
+
+  it("throws if feeAmountBps + platform fee exceeds max (10,000)", async () => {
+    
+    await expect(
+      createReferral({
+        ...referralPayload,
+        feeAmountBps: 10000 - PLATFORM_FEE_BPS + 1,
+      })
+    ).rejects.toThrow(`max fee amount is ${10000 - PLATFORM_FEE_BPS} bps`);
+  })
 });

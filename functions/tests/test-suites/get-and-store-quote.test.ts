@@ -1,4 +1,3 @@
-import { DEFAULT_TOTAL_FEE_BPS } from "../../src/lib/config/constants";
 import { NotFoundError } from "../../src/lib/backend-framework";
 import {
   getAndStoreQuote,
@@ -22,6 +21,7 @@ import { createQuote, QuoteDB } from "../../src/lib/db/quotes";
 import { faker } from "@faker-js/faker";
 import { makeGetAndStoreQuotePayload, makeQuote } from "../factories/quotes";
 import { makeReferral } from "../factories/referrals";
+import { PLATFORM_FEE_BPS } from "../../src/lib/config/constants";
 
 describe("getAndStoreQuote", () => {
   const quoteGetMock = jest.fn();
@@ -47,7 +47,7 @@ describe("getAndStoreQuote", () => {
     (createQuote as jest.Mock).mockResolvedValue(quote);
   });
 
-  it("without referral: uses DEFAULT_TOTAL_FEE_BPS and stores quote with null referral fields", async () => {
+  it("without referral: uses PLATFORM_FEE_BPS and stores quote with null referral fields", async () => {
     basePayload.referralSlug = undefined;
     const res = await getAndStoreQuote(basePayload);
 
@@ -58,7 +58,7 @@ describe("getAndStoreQuote", () => {
       outputMint: basePayload.outputMint,
       amount: basePayload.amount,
       slippageBps: basePayload.slippageBps,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      platformFeeBps: PLATFORM_FEE_BPS,
       swapMode: "ExactIn",
       dynamicSlippage: basePayload.dynamicSlippage,
     });
@@ -67,7 +67,7 @@ describe("getAndStoreQuote", () => {
     expect(createQuote).toHaveBeenCalledTimes(1);
     expect(createQuote).toHaveBeenCalledWith({
       userPublicKey: basePayload.userPublicKey,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      platformFeeBps: PLATFORM_FEE_BPS,
       referralId: undefined,
       referralSlug: undefined,
       referralUserId: undefined,
@@ -78,6 +78,8 @@ describe("getAndStoreQuote", () => {
       amount: String(basePayload.amount),
       slippageBps: basePayload.slippageBps,
       quote: quote.quote,
+      referrerFeeBps: 0,
+      totalFeeBps: PLATFORM_FEE_BPS,
     });
 
     // returns what createQuote returns
@@ -96,14 +98,16 @@ describe("getAndStoreQuote", () => {
       outputMint: basePayload.outputMint,
       amount: basePayload.amount,
       slippageBps: basePayload.slippageBps,
-      platformFeeBps: referral.feeBps,
+      platformFeeBps: referral.platformFeeBps + referral.referrerFeeBps,
       swapMode: "ExactIn",
       dynamicSlippage: basePayload.dynamicSlippage,
     });
 
     expect(createQuote).toHaveBeenCalledWith({
       userPublicKey: basePayload.userPublicKey,
-      platformFeeBps: referral.feeBps,
+      platformFeeBps: referral.platformFeeBps,
+      referrerFeeBps: referral.referrerFeeBps,
+      totalFeeBps: referral.platformFeeBps + referral.referrerFeeBps,
       referralId: referral.id,
       referralSlug: referral.slug,
       referralUserId: referral.userID,
@@ -143,7 +147,7 @@ describe("getAndStoreQuote", () => {
       outputMint: basePayload.outputMint,
       amount: basePayload.amount,
       slippageBps: basePayload.slippageBps,
-      platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
+      platformFeeBps: PLATFORM_FEE_BPS,
       swapMode: "ExactIn",
       dynamicSlippage: basePayload.dynamicSlippage,
     });

@@ -1,19 +1,26 @@
-import { getReferralBySlug, getReferralCountForUser, createReferral as createReferralInDB } from "../../lib/db/referrals";
+import {
+  getReferralBySlug,
+  getReferralCountForUser,
+  createReferral as createReferralInDB,
+} from "../../lib/db/referrals";
 import { ReferralDB } from "../../lib/db/referrals/types";
 import { getUserByID } from "../../lib/db/users";
 import { UserDB, UserID } from "../../lib/db/users/types";
-import { AlreadyExistsError, NotFoundError } from "../../lib/backend-framework/errors";
-import { makeSlug } from "../../lib/slugs";
 import {
-  DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
-  DEFAULT_TOTAL_FEE_BPS,
-} from "../../lib/config/constants";
+  AlreadyExistsError,
+  NotFoundError,
+  ValidationError,
+} from "../../lib/backend-framework/errors";
+import { makeSlug } from "../../lib/slugs";
+import { PLATFORM_FEE_BPS, MAX_BPS } from "../../lib/config/constants";
 
 export interface CreateReferralServiceRequest {
   userID: UserID;
   slug?: string;
   description?: string;
   isActive?: boolean;
+  /** total fee bps of trade going to referrer */
+  feeAmountBps: number;
 }
 
 export type CreateReferralFunction = (
@@ -21,6 +28,15 @@ export type CreateReferralFunction = (
 ) => Promise<ReferralDB>;
 
 export const createReferral: CreateReferralFunction = async (payload) => {
+  if (payload.feeAmountBps > MAX_BPS || payload.feeAmountBps < 0) {
+    throw new ValidationError("feeAmountBps must be between 0 and 10,000");
+  }
+  if (payload.feeAmountBps + PLATFORM_FEE_BPS > MAX_BPS) {
+    throw new ValidationError(
+      `max fee amount is ${MAX_BPS - PLATFORM_FEE_BPS} bps`
+    );
+  }
+
   const user = await getUserByID(payload.userID);
   if (!user) {
     throw new NotFoundError(`User with ID ${payload.userID} not found`);
@@ -42,8 +58,8 @@ export const createReferral: CreateReferralFunction = async (payload) => {
     slug,
     description: payload.description,
     isActive: payload.isActive ?? true,
-    feeBps: DEFAULT_TOTAL_FEE_BPS,
-    referrerShareBpsOfFee: DEFAULT_REFERRER_SHARE_BPS_OF_FEE,
+    platformFeeBps: PLATFORM_FEE_BPS,
+    referrerFeeBps: payload.feeAmountBps,
   });
 
   return referral;

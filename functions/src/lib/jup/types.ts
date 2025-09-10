@@ -8,7 +8,7 @@ import { SolanaWalletAddress } from "../db/generic/types";
 
 export interface ReferrerConfig {
   owner: SolanaWalletAddress;
-  shareBpsOfFee: number;
+  feeAmountBps: number;
 }
 
 export interface BuildSwapInstructionsArgs {
@@ -26,7 +26,7 @@ export interface BuildSwapInstructionsArgs {
   coldTreasuryOwner: SolanaWalletAddress; // receives remainder
 
   // Fees
-  platformFeeBps: number; // e.g. 20 (0.20%)
+  totalFeeBps: number; // e.g. 20 (0.20%)
 
   // Jupiter API
   dynamicSlippage?: boolean;

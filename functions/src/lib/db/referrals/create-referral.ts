@@ -10,8 +10,8 @@ export interface CreateReferralPayload {
   slug: string;
   description?: string;
   isActive: boolean;
-  feeBps: number;
-  referrerShareBpsOfFee: number;
+  platformFeeBps: number;
+  referrerFeeBps: number;
 }
 
 export const createReferral = async (
@@ -22,17 +22,23 @@ export const createReferral = async (
     payload,
   });
   // Validate bps (integers)
-  assertIntBps(payload.feeBps, "feeBps", 0, 10_000);
+  assertIntBps(payload.platformFeeBps, "platformFeeBps", 0, 10_000);
   assertIntBps(
-    payload.referrerShareBpsOfFee,
-    "referrerShareBpsOfFee",
+    payload.referrerFeeBps,
+    "referrerFeeBps",
+    0,
+    10_000
+  );
+  assertIntBps(
+    payload.platformFeeBps + payload.referrerFeeBps,
+    "total fee bps",
     0,
     10_000
   );
   // If fee is zero, ref share must be zero (only matters if you later allow 0)
-  if (payload.feeBps === 0 && payload.referrerShareBpsOfFee !== 0) {
+  if (payload.platformFeeBps === 0 && payload.referrerFeeBps !== 0) {
     throw new ValidationError(
-      "referrerShareBpsOfFee must be 0 when feeBps is 0"
+      "referrerFeeBps must be 0 when platformFeeBps is 0"
     );
   }
 
@@ -44,8 +50,8 @@ export const createReferral = async (
     slug: payload.slug,
     createdAt: timestamp,
     updatedAt: timestamp,
-    feeBps: payload.feeBps,
-    referrerShareBpsOfFee: payload.referrerShareBpsOfFee,
+    platformFeeBps: payload.platformFeeBps,
+    referrerFeeBps: payload.referrerFeeBps,
     isActive: payload.isActive,
     description: payload.description ?? null,
     deletedAt: null,

@@ -3,7 +3,7 @@ import { getReferralBySlug, ReferralDB } from "../../lib/db/referrals";
 import { getJupiterClient } from "../../lib/jup/client";
 import { createQuote, QuoteDB } from "../../lib/db/quotes";
 import { NotFoundError } from "../../lib/backend-framework/errors";
-import { DEFAULT_TOTAL_FEE_BPS } from "../../lib/config/constants";
+import { PLATFORM_FEE_BPS } from "../../lib/config/constants";
 import { logger } from "firebase-functions";
 import { QuoteGetRequest } from "@jup-ag/api";
 
@@ -40,7 +40,7 @@ export const getAndStoreQuote = async (
     }
   }
 
-  const platformFeeBps = referral?.feeBps ?? DEFAULT_TOTAL_FEE_BPS;
+  const totalFeeBps = referral ? referral.platformFeeBps + referral.referrerFeeBps : PLATFORM_FEE_BPS;
 
   // Fetch quote from Jupiter
   const quoteBody: QuoteGetRequest = {
@@ -48,7 +48,7 @@ export const getAndStoreQuote = async (
     outputMint: payload.outputMint,
     amount: payload.amount,
     slippageBps: payload.slippageBps,
-    platformFeeBps,
+    platformFeeBps: totalFeeBps,
     swapMode: DEFAULT_SWAP_MODE,
     dynamicSlippage: payload.dynamicSlippage,
   };
@@ -59,7 +59,9 @@ export const getAndStoreQuote = async (
   // Store quote in DB
   const quoteDB = await createQuote({
     userPublicKey: payload.userPublicKey,
-    platformFeeBps,
+    platformFeeBps: referral?.platformFeeBps ?? PLATFORM_FEE_BPS,
+    referrerFeeBps: referral?.referrerFeeBps ?? 0,
+    totalFeeBps,
     referralId: referral?.id,
     referralSlug: referral?.slug,
     referralUserId: referral?.userID,
