@@ -4,6 +4,7 @@ import { makeJupQuote } from "../factories/quotes";
 import { faker } from "@faker-js/faker";
 import BN from "bn.js";
 import { Keypair } from "@solana/web3.js";
+import { QuoteResponse } from "@jup-ag/api";
 const {
   PublicKey,
   VersionedTransaction,
@@ -206,6 +207,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   let coldATA: string;
   let connection: MockConnection;
   let feeWallet: Keypair;
+  let baseSeedData: Partial<QuoteResponse>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -292,10 +294,19 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       cleanupInstruction: jupIx(BASE58, [], "cleanup"),
       addressLookupTableAddresses: ["ALT1111111111111111111111111111111111111"],
     });
+
+    baseSeedData = {
+      inputMint: MINT,
+      inAmount,
+      platformFee: {
+        amount: new BN(inAmount).mul(new BN(DEFAULT_TOTAL_FEE_BPS)).div(new BN(10_000)).toString(),
+        feeBps: DEFAULT_TOTAL_FEE_BPS
+      }
+    }
   });
 
   it("throws on inputMint mismatch", async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: "OtherMint" });
+    const quote = makeJupQuote({ ...baseSeedData, inputMint: "OtherMint" });
 
     await expect(
       buildAtomicSwapTxWithFeeSplit({
@@ -317,11 +328,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("throws on inAmount mismatch", async () => {
-    const quote = makeJupQuote({
-      inAmount,
-
-      inputMint: MINT,
-    });
+    const quote = makeJupQuote(baseSeedData);
 
     await expect(
       buildAtomicSwapTxWithFeeSplit({
@@ -343,7 +350,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("throws if platformFeeBps !== DEFAULT_TOTAL_FEE_BPS", async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
     const diffMultiplier = faker.datatype.boolean() ? 1 : -1;
     await expect(
       buildAtomicSwapTxWithFeeSplit({
@@ -367,7 +374,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("throws on referrerShareBpsOfFee out of range (negative)", async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
 
     await expect(
       buildAtomicSwapTxWithFeeSplit({
@@ -389,7 +396,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("throws on referrerShareBpsOfFee out of range (positive)", async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
 
     await expect(
       buildAtomicSwapTxWithFeeSplit({
@@ -412,9 +419,8 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
 
   it("throws if swapMode !== ExactIn", async () => {
     const quote = makeJupQuote({
-      inAmount,
-      inputMint: MINT,
       swapMode: "ExactOut",
+      ...baseSeedData
     });
 
     await expect(
@@ -439,7 +445,19 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   it("throws if computed fee is zero", async () => {
     // Choose amount/bps such that floor(amount * bps / 10000) === 0
     const tinyAmount = "1";
-    const quote = makeJupQuote({ inAmount: tinyAmount, inputMint: MINT });
+    const expectedFee = new BN(tinyAmount)
+      .mul(new BN(DEFAULT_TOTAL_FEE_BPS))
+      .div(new BN(10_000));
+    expect(expectedFee.toNumber()).toBe(0); // sanity check
+    const payload = {
+      ...baseSeedData,
+      inAmount: tinyAmount,
+      platformFee: {
+        amount: expectedFee.toString(),
+        feeBps: DEFAULT_TOTAL_FEE_BPS
+      }
+    }
+    const quote = makeJupQuote(payload);
 
     await expect(
       buildAtomicSwapTxWithFeeSplit({
@@ -457,7 +475,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         coldTreasuryOwner: COLD_OWNER,
         platformFeeBps: DEFAULT_TOTAL_FEE_BPS,
       })
-    ).rejects.toThrow("Fee is zero for given amount/bps.");
+    ).rejects.toThrow("Computed fee is less than or equal to zero; increase amount or fee bps.");
   });
 
   it("happy path: creates missing ATAs, calls Jupiter, splits fee correctly, signs, returns base64", async () => {
@@ -466,7 +484,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
 
     // Quote and args
     const refShareBpsOfFee = faker.datatype.number({ min: 100, max: 9000 });
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
     const secret = Uint8Array.from(feeWallet.secretKey);
 
     const { txBase64, lastValidBlockHeight, swapIns } =
@@ -539,7 +557,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("no ref share (0 bps) → only cold transfer issued", async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
 
     await buildAtomicSwapTxWithFeeSplit({
       connection: connection as any,
@@ -575,7 +593,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("100% ref share → only ref transfer, no cold ATA", async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
     await buildAtomicSwapTxWithFeeSplit({
       connection: connection as any,
       quoteResponse: quote,
@@ -617,7 +635,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("default referrerShareBpsOfFee (omitted) → only cold transfer", async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
     await buildAtomicSwapTxWithFeeSplit({
       connection: connection as any,
       quoteResponse: quote,
@@ -652,9 +670,10 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("uses getMint decimals in transfers", async () => {
-    getMintMock.mockResolvedValueOnce({ decimals: 9 }); // override
+    const decimals = faker.datatype.number({ min: 1, max: 18 });
+    getMintMock.mockResolvedValueOnce({ decimals: decimals }); // override
 
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
     await buildAtomicSwapTxWithFeeSplit({
       connection: connection as any,
       quoteResponse: quote,
@@ -675,7 +694,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
     const payloads = createTransferCheckedInstructionMock.mock.results.map(
       (r) => JSON.parse((r.value as any).data.toString())
     );
-    expect(payloads.every((p) => p.decimals === 9)).toBe(true);
+    expect(payloads.every((p) => p.decimals === decimals)).toBe(true);
   });
 
   it("handles no ALTs and no cleanupInstruction", async () => {
@@ -688,7 +707,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       // addressLookupTableAddresses: undefined
     });
 
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
     const res = await buildAtomicSwapTxWithFeeSplit({
       connection: connection as any,
       quoteResponse: quote,
@@ -711,7 +730,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("forwards userPublicKey and dynamic flags to Jupiter", async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
 
     await buildAtomicSwapTxWithFeeSplit({
       connection: connection as any,
@@ -738,7 +757,14 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("rounding: ref share rounds to 0 → no ref transfer", async () => {
-    const quote = makeJupQuote({ inAmount: "1000", inputMint: MINT }); // fee = floor(1000*BPS/10000)
+    const inAmount = "1000";
+    baseSeedData.inAmount = inAmount;
+    baseSeedData.platformFee = {
+      amount: new BN(inAmount).mul(new BN(DEFAULT_TOTAL_FEE_BPS)).div(new BN(10_000)).toString(),
+      feeBps: DEFAULT_TOTAL_FEE_BPS
+    }
+    getMintMock.mockResolvedValueOnce({ decimals: 6 }); // override
+    const quote = makeJupQuote(baseSeedData); // fee = floor(1000*BPS/10000)
     // choose BPS so fee small; e.g., DEFAULT_TOTAL_FEE_BPS=20 → fee=2
     // make ref share tiny so floor(2 * share/10000) = 0
     const tinyShare = 1; // 0.01% of fee → 0 atoms
@@ -796,8 +822,16 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
         .bigInt({ min: 1, max: 10n ** 18n })
         .toString();
       const refShare = faker.datatype.number({ min: 0, max: 10_000 });
+      const payload = {
+        ...baseSeedData,
+        inAmount: amount,
+        platformFee: {
+          amount: new BN(amount).mul(new BN(DEFAULT_TOTAL_FEE_BPS)).div(new BN(10_000)).toString(),
+          feeBps: DEFAULT_TOTAL_FEE_BPS
+        }
+      }
 
-      const quote = makeJupQuote({ inAmount: amount, inputMint: MINT });
+      const quote = makeJupQuote(payload);
       await buildAtomicSwapTxWithFeeSplit({
         connection: connection as any,
         quoteResponse: quote,
@@ -856,7 +890,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it("throws when intermediateFeeOwnerSecretKey does not match intermediateFeeOwner", async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
 
     // make a mismatching secret (different from feeWallet.secretKey)
     const wrongSecret = new Uint8Array(64).fill(9);
@@ -880,7 +914,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it('throws "Expected cold treasury ATA to be defined" when getAssociatedTokenAddress returns null for cold', async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
 
     // Order of calls in your function (with no referrer): intermediate → cold
     // 1st call (intermediate): return deterministic ATA
@@ -918,7 +952,7 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
   });
 
   it('throws "Expected referrer ATA to be defined" when getAssociatedTokenAddress returns null for referrer', async () => {
-    const quote = makeJupQuote({ inAmount, inputMint: MINT });
+    const quote = makeJupQuote(baseSeedData);
 
     // Order with referrer present: intermediate → referrer → cold
     getAssociatedTokenAddressMock

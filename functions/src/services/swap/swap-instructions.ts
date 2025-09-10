@@ -20,9 +20,9 @@ import {
 import { loadKeypair } from "../../lib/crypto/load-keypair";
 import {
   Connection,
-  // SimulateTransactionConfig,
-  // Transaction,
-  // VersionedTransaction,
+  SimulateTransactionConfig,
+  Transaction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { SolanaWalletAddress } from "../../lib/db/generic";
 import { getAndStoreQuote } from "./get-and-store-quote";
@@ -44,28 +44,28 @@ export interface SwapInstructionsResponse {
   quote: QuoteDB;
 }
 
-// async function simulateBase64(connection: Connection, txBase64: string) {
-//   const bytes = Buffer.from(txBase64, "base64");
+async function simulateBase64(connection: Connection, txBase64: string) {
+  const bytes = Buffer.from(txBase64, "base64");
 
-//   // Try v0 first — if it deserializes, it's v0.
-//   try {
-//     const vtx = VersionedTransaction.deserialize(bytes);
-//     const cfg: SimulateTransactionConfig = {
-//       sigVerify: false,
-//       replaceRecentBlockhash: true,
-//     };
-//     return await connection.simulateTransaction(vtx, cfg);
-//   } catch (e) {
-//     // If that failed, treat it as legacy
-//     const ltx = Transaction.from(bytes);
-//     // Legacy overload has no config object. You can pass includeAccounts as 3rd arg if you want.
-//     return await connection.simulateTransaction(
-//       ltx /* signers? */,
-//       undefined /* includeAccounts? */
-//     );
-//     // or: return await connection.simulateTransaction(ltx, undefined, true);
-//   }
-// }
+  // Try v0 first — if it deserializes, it's v0.
+  try {
+    const vtx = VersionedTransaction.deserialize(bytes);
+    const cfg: SimulateTransactionConfig = {
+      sigVerify: false,
+      replaceRecentBlockhash: true,
+    };
+    return await connection.simulateTransaction(vtx, cfg);
+  } catch (e) {
+    // If that failed, treat it as legacy
+    const ltx = Transaction.from(bytes);
+    // Legacy overload has no config object. You can pass includeAccounts as 3rd arg if you want.
+    return await connection.simulateTransaction(
+      ltx /* signers? */,
+      undefined /* includeAccounts? */
+    );
+    // or: return await connection.simulateTransaction(ltx, undefined, true);
+  }
+}
 
 export const swapInstructions = async (
   payload: SwapInstructionsPayload
@@ -146,27 +146,27 @@ export const swapInstructions = async (
 
   const instructions = await buildAtomicSwapTxWithFeeSplit(buildAtomicTxArgs);
 
-  // logger.info("Simulating unsigned swap transaction");
-  // try {
-  //   const sim = await simulateBase64(connection, instructions.txBase64);
-  //   logger.info("Simulation result:", sim);
-  //   if (sim.value.err) {
-  //     logger.error("Simulation of unsigned swap transaction failed", {
-  //       error: sim.value.err,
-  //       logs: sim.value.logs,
-  //     });
-  //     throw new Error(
-  //       "Simulation of unsigned swap transaction failed: " +
-  //         JSON.stringify(sim.value.err)
-  //     );
-  //   }
-  //   logger.info("Simulation succeeded", {
-  //     unitsConsumed: sim.value.unitsConsumed,
-  //     logs: sim.value.logs,
-  //   });
-  // } catch (err) {
-  //   logger.error("Error during simulation of unsigned swap transaction", err);
-  // }
+  try {
+    logger.info("Simulating unsigned swap transaction");
+    const sim = await simulateBase64(connection, instructions.txBase64);
+    logger.info("Simulation result:", sim);
+    if (sim.value.err) {
+      logger.error("Simulation of unsigned swap transaction failed", {
+        error: sim.value.err,
+        logs: sim.value.logs,
+      });
+      throw new Error(
+        "Simulation of unsigned swap transaction failed: " +
+          JSON.stringify(sim.value.err)
+      );
+    }
+    logger.info("Simulation succeeded", {
+      unitsConsumed: sim.value.unitsConsumed,
+      logs: sim.value.logs,
+    });
+  } catch (err) {
+    logger.error("Error during simulation of unsigned swap transaction", err);
+  }
 
   return {
     instructions,
