@@ -1,13 +1,10 @@
 import { buildAtomicSwapTxWithFeeSplit } from "../../src/lib/jup";
-import {
-  PLATFORM_FEE_BPS,
-} from "../../src/lib/config/constants";
+import { PLATFORM_FEE_BPS } from "../../src/lib/config/constants";
 import { makeJupQuote } from "../factories/quotes";
 import { faker } from "@faker-js/faker";
 import BN from "bn.js";
 import { Keypair } from "@solana/web3.js";
 import { QuoteResponse } from "@jup-ag/api";
-import { ref } from "firebase-functions/v1/database";
 const {
   PublicKey,
   VersionedTransaction,
@@ -372,30 +369,6 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       })
     ).rejects.toThrow("inAmount mismatch");
   });
-
-  // it("throws if platformFeeBps !== DEFAULT_TOTAL_FEE_BPS", async () => {
-  //   const quote = makeJupQuote(baseSeedData);
-  //   const diffMultiplier = faker.datatype.boolean() ? 1 : -1;
-  //   await expect(
-  //     buildAtomicSwapTxWithFeeSplit({
-  //       connection: connection as any,
-  //       quoteResponse: quote,
-  //       inputMint: MINT,
-  //       inputAmountAtoms: inAmount,
-  //       userPublicKey: USER,
-  //       intermediateFeeOwner: FEE_OWNER,
-  //       intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
-  //       referrer: {
-  //         owner: REF_OWNER,
-  //         feeAmountBps: referrerFeeBps,
-  //       },
-  //       coldTreasuryOwner: COLD_OWNER,
-  //       platformFeeBps:
-  //         DEFAULT_TOTAL_FEE_BPS +
-  //         diffMultiplier * faker.datatype.number({ min: 1, max: 10 }),
-  //     })
-  //   ).rejects.toThrow(/Unexpected platformFeeBps/);
-  // });
 
   it("throws on referrerFeeAmountBps:  out of range (negative)", async () => {
     const quote = makeJupQuote(baseSeedData);
@@ -1185,4 +1158,91 @@ describe("buildAtomicSwapTxWithFeeSplit", () => {
       })
     ).rejects.toThrow(); // will be a runtime error from using null; acceptable until you add an explicit guard
   });
+
+  it("totalFeeBps = 0 → no transfers and no server signature", async () => {
+    const quote = makeJupQuote({ ...baseSeedData, platformFee: undefined }); // we don't rely on it
+
+    await buildAtomicSwapTxWithFeeSplit({
+      connection: connection as any,
+      quoteResponse: quote,
+      inputMint: MINT,
+      inputAmountAtoms: inAmount,
+      userPublicKey: USER,
+      intermediateFeeOwner: FEE_OWNER,
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+      // no referrer
+      coldTreasuryOwner: COLD_OWNER,
+      totalFeeBps: 0, // zero fee
+    });
+
+    expect(createTransferCheckedInstructionMock).not.toHaveBeenCalled();
+    expect(
+      require("@solana/web3.js").VersionedTransaction.__signSpy
+    ).not.toHaveBeenCalled();
+  });
+
+  it("throws when referrer.feeAmountBps > totalFeeBps", async () => {
+    const quote = makeJupQuote(baseSeedData);
+
+    await expect(
+      buildAtomicSwapTxWithFeeSplit({
+        connection: connection as any,
+        quoteResponse: quote,
+        inputMint: MINT,
+        inputAmountAtoms: inAmount,
+        userPublicKey: USER,
+        intermediateFeeOwner: FEE_OWNER,
+        intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+        referrer: { owner: REF_OWNER, feeAmountBps: 500 },
+        coldTreasuryOwner: COLD_OWNER,
+        totalFeeBps: 400, // smaller than referrer bps
+      })
+    ).rejects.toThrow("Referrer fee bps cannot exceed total fee bps");
+  });
+
+  it("no signing when only post-swap create-ATAs occur (no transfers)", async () => {
+    // force creates by making ATAs absent
+    connection.setATA(feeATA, false);
+    connection.setATA(refATA, false);
+    connection.setATA(coldATA, false);
+
+    const quote = makeJupQuote({...baseSeedData, inAmount: "1"});
+    await buildAtomicSwapTxWithFeeSplit({
+      connection: connection as any,
+      quoteResponse: quote,
+      inputMint: MINT,
+      inputAmountAtoms: "1", // tiny so totalFeeAtoms=0
+      userPublicKey: USER,
+      intermediateFeeOwner: FEE_OWNER,
+      intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+      // referrer omitted
+      coldTreasuryOwner: COLD_OWNER,
+      totalFeeBps: 0,
+    });
+
+    expect(createTransferCheckedInstructionMock).not.toHaveBeenCalled();
+    expect(
+      require("@solana/web3.js").VersionedTransaction.__signSpy
+    ).not.toHaveBeenCalled();
+  });
+
+  // it("zero-fee short-circuit would omit feeAccount (if enabled)", async () => {
+  //   const quote = makeJupQuote({ ...baseSeedData, platformFee: undefined, inAmount: "10000" });
+
+  //   await buildAtomicSwapTxWithFeeSplit({
+  //     connection: connection as any,
+  //     quoteResponse: quote,
+  //     inputMint: MINT,
+  //     inputAmountAtoms: "10000",
+  //     userPublicKey: USER,
+  //     intermediateFeeOwner: FEE_OWNER,
+  //     intermediateFeeOwnerSecretKey: Uint8Array.from(feeWallet.secretKey),
+  //     coldTreasuryOwner: COLD_OWNER,
+  //     totalFeeBps: 0,
+  //   });
+
+  //   const call = swapInstructionsPostMock.mock.calls[0][0];
+  //   expect(call.swapRequest.feeAccount).toBeUndefined(); // <- enable after short-circuit change
+  //   expect(call.swapRequest.userPublicKey).toBe(USER);
+  // });
 });

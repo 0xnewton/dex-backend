@@ -93,9 +93,6 @@ export async function buildAtomicSwapTxWithFeeSplit(
 
   // Total fee from volume
   const totalFeeAtoms = inAmountBN.mul(totalBps).div(new BN(10_000));
-  if (totalFeeAtoms.lt(new BN(0))) {
-    throw new BadRequestError("Computed fee is less than zero");
-  }
 
   // Referrer gets refBps of volume
   const refInAtoms = inAmountBN.mul(refBps).div(new BN(10_000));
