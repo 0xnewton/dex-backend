@@ -3,7 +3,7 @@ import { createUser } from "../../lib/db/users";
 import { createSolanaWallet } from "../../lib/crypto";
 import { logger } from "firebase-functions";
 import { createSecret, deleteSecret } from "../../lib/secret-manager";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import { makeSlug } from "../../lib/slugs";
 
 export type OnUserCreatedFunction = (user: UserRecord) => Promise<void>;
@@ -12,7 +12,7 @@ export const onUserCreated: OnUserCreatedFunction = async (user) => {
   logger.info("User service - onUserCreated", { uid: user.uid, user });
   // Creates a wallet and stores the private key in KMS
   const wallet = createSolanaWallet();
-  const secretId = uuidv4();
+  const secretId = randomUUID();
   logger.info("Created wallet for user", {
     address: wallet.publicKey,
     secretId,

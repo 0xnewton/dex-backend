@@ -1,11 +1,12 @@
 import { SwapApi, createJupiterApiClient } from "@jup-ag/api";
-// import { jupPrivateKey } from "../secrets";
+import { jupPrivateKey } from "../config/secrets";
 
 let client: SwapApi | null = null;
 
 export const getJupiterClient = () => {
   if (!client) {
-    client = createJupiterApiClient();
+    const apiKey = jupPrivateKey.value();
+    client = createJupiterApiClient(apiKey ? { apiKey } : undefined);
   }
   return client;
 };

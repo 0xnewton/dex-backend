@@ -22,12 +22,14 @@ class ReferralsController extends BaseController {
       throw new UnauthorizedError();
     }
 
+    const { slug, description, isActive, feeAmountBps } = ctx.payload;
+
     const referralCreated = await this.referralService.createReferral({
       userID: ctx.claims.user.id,
-      slug: ctx.request.body.slug,
-      description: ctx.request.body.description,
-      isActive: ctx.request.body.isActive,
-      feeAmountBps: ctx.request.body.feeAmountBps,
+      slug,
+      description,
+      isActive,
+      feeAmountBps,
     });
 
     return referralCreated;

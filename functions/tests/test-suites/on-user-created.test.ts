@@ -15,8 +15,8 @@ jest.mock("../../src/lib/secret-manager", () => ({
   deleteSecret: jest.fn(),
 }));
 
-jest.mock("uuid", () => ({
-  v4: jest.fn(),
+jest.mock("crypto", () => ({
+  randomUUID: jest.fn(),
 }));
 
 jest.mock("../../src/lib/slugs", () => ({
@@ -27,8 +27,8 @@ import { createUser } from "../../src/lib/db/users";
 import { createSolanaWallet } from "../../src/lib/crypto";
 import { logger } from "firebase-functions";
 import { createSecret, deleteSecret } from "../../src/lib/secret-manager";
-import { v4 as uuidv4 } from "uuid";
 import { makeSlug } from "../../src/lib/slugs";
+import { randomUUID } from "crypto";
 import { faker } from "@faker-js/faker";
 import { WalletKeyPair } from "../../src/lib/crypto/types";
 import { makeWallet } from "../factories/wallet";
@@ -46,7 +46,7 @@ describe("onUserCreated", () => {
     secretId = faker.random.word();
     secretPath = faker.random.alphaNumeric(10);
     (createSolanaWallet as jest.Mock).mockReturnValue(wallet);
-    (uuidv4 as jest.Mock).mockReturnValue(secretId);
+    (randomUUID as jest.Mock).mockReturnValue(secretId);
     (createSecret as jest.Mock).mockResolvedValue(secretPath);
     let displayName = faker.internet.userName();
     const userDB = makeUser({
@@ -78,7 +78,6 @@ describe("onUserCreated", () => {
 
     expect(logger.info).toHaveBeenCalled(); // at least once
     expect(createSolanaWallet).toHaveBeenCalledTimes(1);
-    expect(uuidv4).toHaveBeenCalledTimes(1);
     expect(createSecret).toHaveBeenCalledWith(secretId, wallet.privateKey);
     expect(makeSlug).toHaveBeenCalledWith(user.displayName);
 
@@ -160,7 +159,7 @@ describe("onUserCreated", () => {
         toJSON: () => ({}),
       },
     ];
-    user = {...user, providerData: providerData, toJSON: jest.fn()}; 
+    user = { ...user, providerData: providerData, toJSON: jest.fn() };
     (createUser as jest.Mock).mockResolvedValue(undefined);
 
     await onUserCreated(user);
