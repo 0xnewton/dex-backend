@@ -27,6 +27,7 @@ class ReferralsController extends BaseController {
       slug: ctx.request.body.slug,
       description: ctx.request.body.description,
       isActive: ctx.request.body.isActive,
+      feeAmountBps: ctx.request.body.feeAmountBps,
     });
 
     return referralCreated;
